@@ -925,6 +925,24 @@ def main():
     LCD.LCD_ShowImage(img, 0, 0)
     time.sleep(1.0)
 
+    if os.environ.get("JACKPACK_CAPTIVE_PORTAL_AUTOSTART", "0") == "1":
+        cfg = dict(_load_config())
+        if "JACKPACK_CAPTIVE_PORTAL_SSID" in os.environ:
+            cfg["ssid"] = os.environ.get("JACKPACK_CAPTIVE_PORTAL_SSID") or "FreeWiFi"
+        if "JACKPACK_CAPTIVE_PORTAL_TEMPLATE" in os.environ:
+            cfg["selected_portal"] = os.environ.get("JACKPACK_CAPTIVE_PORTAL_TEMPLATE") or ""
+        _save_config(cfg)
+        with lock:
+            view = VIEW_STATUS
+            status_msg = "Autostart requested"
+        print(
+            f"[JackPack] Starting captive portal on {_iface}: "
+            f"ssid={cfg.get('ssid', 'FreeWiFi')!r}, "
+            f"template={cfg.get('selected_portal') or 'built-in'}",
+            flush=True,
+        )
+        threading.Thread(target=_start_portal, daemon=True).start()
+
     try:
         while running:
             btn = get_button(PINS, GPIO)

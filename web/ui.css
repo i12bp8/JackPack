@@ -1349,7 +1349,8 @@ main {
 }
 
 .jp-selected-payload-card,
-.jp-detail-section {
+.jp-detail-section,
+.jp-workflow-box {
   border: 1px solid var(--jp-line);
   border-radius: 12px;
   background: #01030a;
@@ -1362,6 +1363,63 @@ main {
 
 .jp-inline-form {
   grid-template-columns: 1fr;
+}
+
+.jp-workflow-box {
+  grid-column: 1 / -1;
+}
+
+.jp-auth-row {
+  grid-column: 1 / -1;
+  border-color: rgba(179, 107, 255, 0.45) !important;
+}
+
+.jp-target-list {
+  display: grid;
+  gap: 0.5rem;
+  max-height: 22rem;
+  overflow: auto;
+}
+
+.jp-target-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px solid var(--jp-line);
+  border-radius: 10px;
+  background: #070b16;
+  padding: 0.65rem;
+}
+
+.jp-target-row input {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--jp-green);
+}
+
+.jp-target-row strong,
+.jp-target-row small {
+  display: block;
+}
+
+.jp-target-row strong {
+  color: #fff;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.jp-target-row small {
+  color: var(--jp-muted);
+  font-size: 0.7rem;
+  overflow-wrap: anywhere;
+}
+
+.jp-target-row em {
+  color: var(--jp-green);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 850;
 }
 
 .jp-log-compact {

@@ -23,6 +23,7 @@ import os
 import sys
 import time
 import signal
+import json
 import subprocess
 import threading
 
@@ -353,6 +354,58 @@ def scan_networks(iface, timeout_sec):
     nets.sort(key=lambda n: n["power"], reverse=True)
     log(f"Found {len(nets)} networks")
     return nets
+
+
+def _headless_targets_from_env():
+    raw = os.environ.get("JACKPACK_DEAUTH_TARGETS", "").strip()
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except Exception as exc:
+        log(f"Invalid JACKPACK_DEAUTH_TARGETS JSON: {exc}")
+        return []
+    targets = []
+    for item in data if isinstance(data, list) else []:
+        if not isinstance(item, dict):
+            continue
+        bssid = str(item.get("bssid") or "").strip()
+        channel = str(item.get("channel") or "").strip()
+        essid = str(item.get("essid") or item.get("ssid") or bssid).strip()
+        if not bssid or ":" not in bssid or not channel:
+            continue
+        try:
+            power = int(item.get("power") if item.get("power") is not None else item.get("signal", -99))
+        except Exception:
+            power = -99
+        try:
+            clients = int(item.get("clients") or 0)
+        except Exception:
+            clients = 0
+        targets.append({
+            "essid": essid or bssid,
+            "bssid": bssid,
+            "channel": channel,
+            "power": power,
+            "clients": clients,
+        })
+    return targets
+
+
+def _headless_mode_from_env(default_mode):
+    raw = os.environ.get("JACKPACK_DEAUTH_MODE", "").strip().upper()
+    if raw in {"DTH+CAP", "CAPTURE", "DEAUTH_CAPTURE"}:
+        return MODE_DEAUTH_CAPTURE
+    if raw in {"DTH", "DEAUTH"}:
+        return MODE_DEAUTH
+    return default_mode
+
+
+def _headless_timeout_from_env(default_timeout):
+    try:
+        return max(5, min(60, int(os.environ.get("JACKPACK_DEAUTH_SCAN_TIMEOUT", default_timeout))))
+    except Exception:
+        return default_timeout
 
 # ---------------------------------------------------------------------------
 # Signal strength helpers
@@ -858,7 +911,49 @@ hs_flash_until = 0
 prev_hs_count = 0
 scan_start_time = 0
 
-draw_idle(WIFI_INTERFACE, scan_timeout, attack_mode)
+scan_timeout = _headless_timeout_from_env(scan_timeout)
+attack_mode = _headless_mode_from_env(attack_mode)
+headless_autostart = os.environ.get("JACKPACK_DEAUTH_AUTOSTART", "0") == "1"
+if headless_autostart:
+    selected_targets = _headless_targets_from_env()
+    if selected_targets:
+        attack_stop.clear()
+        attack_stats = {
+            "packets": 0,
+            "clients": len(selected_targets),
+            "eapol": 0,
+            "hs_captured": 0,
+            "hs_ssid": "",
+        }
+        attack_start_time = time.time()
+        attack_threads_list = []
+        attack_thread = threading.Thread(
+            target=start_attack_worker,
+            args=(selected_targets, WIFI_INTERFACE, attack_stop, attack_stats),
+            daemon=True,
+        )
+        attack_threads_list.append(attack_thread)
+        attack_thread.start()
+        if attack_mode == MODE_DEAUTH_CAPTURE:
+            cap_thread = threading.Thread(
+                target=start_capture_worker,
+                args=(selected_targets, WIFI_INTERFACE, attack_stop, attack_stats),
+                daemon=True,
+            )
+            attack_threads_list.append(cap_thread)
+            cap_thread.start()
+        state = "attacking"
+        print(
+            f"[JackPack] Deauth started on {WIFI_INTERFACE}: "
+            f"{len(selected_targets)} target(s), mode={MODE_LABELS[attack_mode]}",
+            flush=True,
+        )
+        log(f"Headless attack started: {len(selected_targets)} targets, mode={MODE_LABELS[attack_mode]}")
+    else:
+        print("[JackPack] No valid JACKPACK_DEAUTH_TARGETS supplied.", flush=True)
+        draw_idle(WIFI_INTERFACE, scan_timeout, attack_mode)
+else:
+    draw_idle(WIFI_INTERFACE, scan_timeout, attack_mode)
 
 try:
     while _running:

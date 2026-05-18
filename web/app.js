@@ -89,6 +89,7 @@
   const payloadDetailTags = document.getElementById("payloadDetailTags");
   const payloadInlineStatus = document.getElementById("payloadInlineStatus");
   const payloadInlineForm = document.getElementById("payloadInlineForm");
+  const payloadInlineRawWrap = document.getElementById("payloadInlineRawWrap");
   const payloadInlineRaw = document.getElementById("payloadInlineRaw");
   const payloadInlineLaunch = document.getElementById("payloadInlineLaunch");
   const payloadLibraryActive = document.getElementById("payloadLibraryActive");
@@ -635,6 +636,7 @@
     activeSchema: null,
     selectedPath: "",
     selectedSchema: null,
+    workflow: { path: "", networks: [], selectedBssids: {}, portals: [], status: "" },
     selectedCategory: "",
     query: "",
   };
@@ -770,7 +772,11 @@
     if (!payloadActionGrid) return;
     const running = !!payloadState.activePath;
     const schema = payloadState.activeSchema || {};
-    const actions = Array.isArray(schema.actions) ? schema.actions : [];
+    const legacyButtons = new Set(["UP", "DOWN", "LEFT", "RIGHT", "OK", "KEY1", "KEY2", "KEY3"]);
+    const actions = (Array.isArray(schema.actions) ? schema.actions : []).filter((action) => {
+      const button = String(action.button || "").toUpperCase();
+      return !legacyButtons.has(button) || action.web_native === true || action.headless === true;
+    });
     if (payloadControlStatus) {
       payloadControlStatus.textContent = running
         ? `Runtime controls for ${payloadLabel(payloadState.activePath)}`
@@ -779,7 +785,7 @@
           : "Choose a payload to configure and run.";
     }
     if (!actions.length) {
-      payloadActionGrid.innerHTML = `<div class="jp-empty-form">No web-native runtime actions declared for this payload yet. Use Setup to launch it, watch Live Output, and stop it from the console.</div>`;
+      payloadActionGrid.innerHTML = `<div class="jp-empty-form">Legacy LCD keypad controls are hidden in JackPack. Use the workflow setup above, watch Live Output, and stop the run from this console.</div>`;
       return;
     }
     payloadActionGrid.innerHTML = actions
@@ -2784,6 +2790,22 @@
         ${help}
       </label>`;
     }
+    if (field.type === "portal_select") {
+      const portals = Array.isArray(payloadState.workflow?.portals) && payloadState.workflow.portals.length
+        ? payloadState.workflow.portals
+        : [{ id: "", label: "Built-in WiFi Login" }];
+      return `<label class="jp-field">
+        <span>${label}</span>
+        <select data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} ${required}>
+          ${portals.map((portal) => {
+            const value = String(portal.id || "");
+            const selected = value === def ? "selected" : "";
+            return `<option value="${escapeHtml(value)}" ${selected}>${escapeHtml(portal.label || value || "Built-in WiFi Login")}</option>`;
+          }).join("")}
+        </select>
+        ${help}
+      </label>`;
+    }
     return `<label class="jp-field">
       <span>${label}</span>
       <input type="${field.type === "number" ? "number" : "text"}" data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} value="${escapeHtml(def)}" ${required}>
@@ -2802,6 +2824,199 @@
     if (rawInput) rawInput.value = "";
   }
 
+  function workflowForSelectedSchema() {
+    const schema = payloadState.selectedSchema || payloadState.activeSchema || {};
+    return schema.workflow && typeof schema.workflow === "object" ? schema.workflow : null;
+  }
+
+  function renderWorkflowAuthorization(workflow) {
+    if (!workflow || !workflow.requires_authorization) return "";
+    return `<label class="jp-check-row jp-auth-row">
+      <input type="checkbox" data-workflow-authorized>
+      <span><strong>Authorized test</strong><small>I have explicit permission to run this workflow on the selected target(s).</small></span>
+    </label>`;
+  }
+
+  function renderWifiTargetRows() {
+    const networks = Array.isArray(payloadState.workflow.networks) ? payloadState.workflow.networks : [];
+    if (!networks.length) {
+      return '<div class="jp-empty-form">No AP scan loaded yet. Pick the external WiFi adapter, then press Scan APs.</div>';
+    }
+    return networks
+      .map((net) => {
+        const bssid = String(net.bssid || "");
+        const ssid = String(net.ssid || net.essid || "(hidden)");
+        const signal = net.signal === null || net.signal === undefined ? "-" : `${net.signal}%`;
+        const channel = String(net.channel || "");
+        const security = String(net.security || "");
+        const checked = payloadState.workflow.selectedBssids?.[bssid] ? "checked" : "";
+        return `<label class="jp-target-row">
+          <input type="checkbox" data-wifi-target
+            data-ssid="${escapeHtml(ssid)}"
+            data-bssid="${escapeHtml(bssid)}"
+            data-channel="${escapeHtml(channel)}"
+            data-signal="${escapeHtml(net.signal ?? "")}"
+            ${checked}>
+          <span class="min-w-0">
+            <strong>${escapeHtml(ssid)}</strong>
+            <small>${escapeHtml([bssid, channel ? `ch ${channel}` : "", security].filter(Boolean).join(" · "))}</small>
+          </span>
+          <em>${escapeHtml(signal)}</em>
+        </label>`;
+      })
+      .join("");
+  }
+
+  function renderPayloadWorkflow(schema) {
+    const workflow = schema?.workflow;
+    if (!workflow || !payloadInlineForm) return false;
+    if (payloadInlineRawWrap) payloadInlineRawWrap.classList.add("hidden");
+    const formSchema = { fields: Array.isArray(workflow.fields) ? workflow.fields : [] };
+    renderPayloadFormInto(payloadInlineForm, formSchema, null, "This workflow does not need setup fields.");
+    if (workflow.type === "wifi_ap_targets") {
+      payloadInlineForm.insertAdjacentHTML(
+        "beforeend",
+        `${renderWorkflowAuthorization(workflow)}
+        <div class="jp-workflow-box">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <div class="jp-mini-title">Targets</div>
+              <div class="jp-panel-subtitle">Scan APs, then select one or more authorized test targets.</div>
+            </div>
+            <button type="button" class="jp-btn" data-workflow-scan-wifi><i class="fa-solid fa-magnifying-glass"></i> ${escapeHtml(workflow.scan_label || "Scan APs")}</button>
+          </div>
+          <div class="jp-target-list mt-3">${renderWifiTargetRows()}</div>
+        </div>`,
+      );
+      return true;
+    }
+    if (workflow.type === "captive_portal") {
+      payloadInlineForm.insertAdjacentHTML(
+        "beforeend",
+        `${renderWorkflowAuthorization(workflow)}
+        <div class="jp-workflow-box">
+          <div class="jp-mini-title">Portal Runtime</div>
+          <div class="jp-panel-subtitle">The selected template and SSID are written into the payload config before launch.</div>
+        </div>`,
+      );
+      if (!payloadState.workflow.portals.length) {
+        loadWorkflowPortals().catch(() => {});
+      }
+      return true;
+    }
+    if (payloadInlineRawWrap) payloadInlineRawWrap.classList.remove("hidden");
+    return false;
+  }
+
+  function workflowFieldEnv(formEl = payloadInlineForm) {
+    return buildPayloadArgsFromForm(formEl, null).env || {};
+  }
+
+  async function loadWorkflowPortals() {
+    const res = await apiFetch(getApiUrl("/api/payloads/workflow/portals"), { cache: "no-store" });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "portal_load_failed");
+    payloadState.workflow.portals = Array.isArray(data.portals) ? data.portals : [];
+    if (payloadState.selectedSchema?.workflow?.type === "captive_portal") {
+      renderPayloadDetail(payloadState.selectedSchema);
+    }
+  }
+
+  async function scanWorkflowWifiTargets() {
+    const workflow = workflowForSelectedSchema();
+    if (!workflow || workflow.type !== "wifi_ap_targets") return;
+    const env = workflowFieldEnv();
+    const iface = env.JACKPACK_SELECTED_IFACE || env.JACKPACK_ATTACK_IFACE || "wlan1";
+    if (payloadInlineStatus) payloadInlineStatus.textContent = `Scanning ${iface}...`;
+    payloadState.workflow.status = `Scanning ${iface}...`;
+    try {
+      const res = await apiFetch(getApiUrl("/api/network/scan"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ iface }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "scan_failed");
+      payloadState.workflow.networks = Array.isArray(data.networks) ? data.networks : [];
+      payloadState.workflow.selectedBssids = {};
+      if (payloadInlineStatus) {
+        payloadInlineStatus.textContent = `${payloadState.workflow.networks.length} AP${payloadState.workflow.networks.length === 1 ? "" : "s"} found.`;
+      }
+      payloadState.workflow.status = payloadState.workflow.networks.length
+        ? `${payloadState.workflow.networks.length} AP${payloadState.workflow.networks.length === 1 ? "" : "s"} found. Select authorized targets, then launch.`
+        : "No APs found. Try a longer scan time or another adapter.";
+      renderPayloadDetail(payloadState.selectedSchema);
+    } catch (e) {
+      payloadState.workflow.status = e && e.message ? e.message : "Scan failed";
+      if (payloadInlineStatus) payloadInlineStatus.textContent = payloadState.workflow.status;
+    }
+  }
+
+  function selectedWifiTargetsFromDom() {
+    if (!payloadInlineForm) return [];
+    return Array.from(payloadInlineForm.querySelectorAll("[data-wifi-target]:checked"))
+      .map((el) => {
+        const signalRaw = el.getAttribute("data-signal") || "";
+        let power = -99;
+        if (/^-?\d+$/.test(signalRaw)) {
+          const signal = Number(signalRaw);
+          power = signal > 0 ? Math.round((signal / 2) - 100) : signal;
+        }
+        return {
+          ssid: el.getAttribute("data-ssid") || "",
+          essid: el.getAttribute("data-ssid") || "",
+          bssid: el.getAttribute("data-bssid") || "",
+          channel: el.getAttribute("data-channel") || "",
+          signal: signalRaw,
+          power,
+          clients: 0,
+        };
+      })
+      .filter((item) => item.bssid && item.channel);
+  }
+
+  function buildWorkflowLaunch(schema) {
+    const workflow = schema?.workflow;
+    if (!workflow) return null;
+    const env = workflowFieldEnv();
+    const authorized = !workflow.requires_authorization || !!payloadInlineForm?.querySelector("[data-workflow-authorized]")?.checked;
+    if (!authorized) {
+      return { ok: false, error: "Confirm this is an authorized test first." };
+    }
+    if (workflow.type === "wifi_ap_targets") {
+      const targets = selectedWifiTargetsFromDom();
+      if (!targets.length) {
+        return { ok: false, error: "Select at least one AP target first." };
+      }
+      env[workflow.target_env || "JACKPACK_DEAUTH_TARGETS"] = JSON.stringify(targets);
+      env[workflow.autostart_env || "JACKPACK_DEAUTH_AUTOSTART"] = "1";
+      return { ok: true, args: [], env };
+    }
+    if (workflow.type === "captive_portal") {
+      env[workflow.autostart_env || "JACKPACK_CAPTIVE_PORTAL_AUTOSTART"] = "1";
+      if (!env.JACKPACK_CAPTIVE_PORTAL_SSID) {
+        return { ok: false, error: "Enter a portal SSID first." };
+      }
+      return { ok: true, args: [], env };
+    }
+    return null;
+  }
+
+  function handleWorkflowFormChange(e) {
+    const target = e.target;
+    if (!target || !target.matches("[data-wifi-target]")) return;
+    const bssid = target.getAttribute("data-bssid") || "";
+    if (!bssid) return;
+    payloadState.workflow.selectedBssids[bssid] = !!target.checked;
+  }
+
+  function handleWorkflowFormClick(e) {
+    const scanBtn = e.target.closest("[data-workflow-scan-wifi]");
+    if (scanBtn) {
+      scanWorkflowWifiTargets();
+    }
+  }
+
   function renderPayloadDetail(schema) {
     const path = String(schema?.path || payloadState.selectedPath || "");
     const meta = schema?.meta || {};
@@ -2814,8 +3029,9 @@
       payloadDetailPath.textContent = selected ? path : "Pick from the list on the left.";
     }
     if (payloadDetailDescription) {
+      const workflowSummary = schema?.workflow?.summary || "";
       payloadDetailDescription.textContent = selected
-        ? (meta.description || "This payload does not describe itself yet. Setup and inferred controls are shown below.")
+        ? (workflowSummary || meta.description || "This payload does not describe itself yet. Setup and inferred controls are shown below.")
         : "Payload setup will appear here with web-native fields whenever JackPack can infer them.";
     }
     if (payloadDetailTags) {
@@ -2823,20 +3039,26 @@
         ? tags.slice(0, 6).map((tag, idx) => `<span class="jp-tag ${idx === 0 ? "jp-tag-purple" : ""}">${escapeHtml(String(tag))}</span>`).join("")
         : "";
     }
-    renderPayloadFormInto(
-      payloadInlineForm,
-      schema,
-      payloadInlineRaw,
-      selected
-        ? "No setup fields were detected for this payload yet. Launch with defaults, or add raw args if the payload supports CLI flags."
-        : "Select a payload to see setup fields.",
-    );
+    const hasWorkflow = renderPayloadWorkflow(schema);
+    if (!hasWorkflow) {
+      if (payloadInlineRawWrap) payloadInlineRawWrap.classList.remove("hidden");
+      renderPayloadFormInto(
+        payloadInlineForm,
+        schema,
+        payloadInlineRaw,
+        selected
+          ? "No setup fields were detected for this payload yet. Launch with defaults, or add raw args if the payload supports CLI flags."
+          : "Select a payload to see setup fields.",
+      );
+    }
     if (payloadInlineStatus) {
-      const fieldCount = Array.isArray(schema?.fields) ? schema.fields.length : 0;
+      const fieldCount = Array.isArray((hasWorkflow ? schema?.workflow?.fields : schema?.fields)) ? (hasWorkflow ? schema.workflow.fields.length : schema.fields.length) : 0;
       payloadInlineStatus.textContent = selected
-        ? fieldCount
-          ? `${fieldCount} setup field${fieldCount === 1 ? "" : "s"} ready.`
-          : "Launches with defaults."
+        ? hasWorkflow
+          ? (payloadState.workflow.status || schema?.workflow?.summary || "Configure this workflow, then launch.")
+          : fieldCount
+            ? `${fieldCount} setup field${fieldCount === 1 ? "" : "s"} ready.`
+            : "Launches with defaults."
         : "Select a payload first.";
     }
     if (payloadInlineLaunch) {
@@ -2862,6 +3084,9 @@
   async function selectPayload(path, opts = {}) {
     const cleanPath = String(path || "");
     if (!cleanPath) return;
+    if (payloadState.workflow.path !== cleanPath) {
+      payloadState.workflow = { path: cleanPath, networks: [], selectedBssids: {}, portals: [], status: "" };
+    }
     payloadState.selectedPath = cleanPath;
     if (payloadInlineStatus) payloadInlineStatus.textContent = "Loading setup...";
     if (payloadInlineLaunch) payloadInlineLaunch.disabled = true;
@@ -2874,7 +3099,9 @@
       const res = await apiFetch(getApiUrl("/api/payloads/schema", { path: cleanPath }), { cache: "no-store" });
       const schema = await res.json();
       if (!res.ok) throw new Error(schema && schema.error ? schema.error : "schema_failed");
-      const needsInterfaces = Array.isArray(schema.fields) && schema.fields.some((field) => field && field.type === "interface");
+      const schemaFields = Array.isArray(schema.fields) ? schema.fields : [];
+      const workflowFields = Array.isArray(schema.workflow?.fields) ? schema.workflow.fields : [];
+      const needsInterfaces = [...schemaFields, ...workflowFields].some((field) => field && field.type === "interface");
       if (needsInterfaces && !networkState.interfaces.length) {
         await loadNetworkStatus();
       }
@@ -2943,6 +3170,18 @@
   async function confirmInlinePayloadLaunch() {
     const path = payloadState.selectedPath;
     if (!path) return;
+    const workflowLaunch = buildWorkflowLaunch(payloadState.selectedSchema);
+    if (workflowLaunch) {
+      if (!workflowLaunch.ok) {
+        if (payloadInlineStatus) payloadInlineStatus.textContent = workflowLaunch.error || "Workflow is incomplete.";
+        payloadState.workflow.status = workflowLaunch.error || "Workflow is incomplete.";
+        return;
+      }
+      payloadState.activeSchema = payloadState.selectedSchema || null;
+      await startPayload(path, workflowLaunch.args, workflowLaunch.env);
+      scrollIntoWorkbench(payloadDetailPanel);
+      return;
+    }
     const built = buildPayloadArgsFromForm(payloadInlineForm, payloadInlineRaw);
     payloadState.activeSchema = payloadState.selectedSchema || null;
     await startPayload(path, built.args, built.env);
@@ -3431,6 +3670,10 @@
     });
   if (payloadInlineLaunch)
     payloadInlineLaunch.addEventListener("click", confirmInlinePayloadLaunch);
+  if (payloadInlineForm) {
+    payloadInlineForm.addEventListener("click", handleWorkflowFormClick);
+    payloadInlineForm.addEventListener("change", handleWorkflowFormChange);
+  }
   if (payloadActionGrid)
     payloadActionGrid.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-payload-action]");

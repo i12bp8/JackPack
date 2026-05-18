@@ -117,6 +117,91 @@ _CATEGORY_INFO = {
     "payloads": ("Payloads", "Imported or uncategorized payload scripts."),
     "general": ("General", "General-purpose payload scripts."),
 }
+PORTAL_SITES_DIR = Path(os.environ.get("JACKPACK_PORTAL_SITES_DIR", str(ROOT_DIR / "config" / "portal_sites")))
+
+
+def _workflow_schema(rel_path: str) -> dict | None:
+    if rel_path == "wifi/deauth.py":
+        return {
+            "type": "wifi_ap_targets",
+            "title": "WiFi Deauth",
+            "summary": "Scan APs, select authorized test targets, choose mode, then launch the payload.",
+            "scan_label": "Scan APs",
+            "target_mode": "multi",
+            "requires_authorization": True,
+            "fields": [
+                {
+                    "name": "iface",
+                    "env": "JACKPACK_SELECTED_IFACE",
+                    "label": "WiFi Adapter",
+                    "type": "interface",
+                    "iface_type": "wifi",
+                    "required": True,
+                    "default": _env_first("JACKPACK_ATTACK_IFACE", "PACKJACK_ATTACK_IFACE", default="wlan1"),
+                    "help": "External USB WiFi adapter used for scanning and payload traffic.",
+                },
+                {
+                    "name": "mode",
+                    "env": "JACKPACK_DEAUTH_MODE",
+                    "label": "Mode",
+                    "type": "select",
+                    "default": "DTH",
+                    "choices": ["DTH", "DTH+CAP"],
+                    "help": "DTH+CAP also attempts EAPOL capture when Scapy is available.",
+                },
+                {
+                    "name": "scan_timeout",
+                    "env": "JACKPACK_DEAUTH_SCAN_TIMEOUT",
+                    "label": "Scan Time",
+                    "type": "number",
+                    "default": "12",
+                    "min": 5,
+                    "max": 60,
+                    "help": "Seconds to scan before showing AP results.",
+                },
+            ],
+            "target_env": "JACKPACK_DEAUTH_TARGETS",
+            "autostart_env": "JACKPACK_DEAUTH_AUTOSTART",
+        }
+    if rel_path == "wifi/captive_portal.py":
+        return {
+            "type": "captive_portal",
+            "title": "Captive Portal",
+            "summary": "Select a portal template, set the AP SSID, then launch the portal on the external WiFi adapter.",
+            "requires_authorization": True,
+            "portal_endpoint": "/api/payloads/workflow/portals",
+            "fields": [
+                {
+                    "name": "iface",
+                    "env": "JACKPACK_SELECTED_IFACE",
+                    "label": "WiFi Adapter",
+                    "type": "interface",
+                    "iface_type": "wifi",
+                    "required": True,
+                    "default": _env_first("JACKPACK_ATTACK_IFACE", "PACKJACK_ATTACK_IFACE", default="wlan1"),
+                    "help": "External USB WiFi adapter used to host the portal AP.",
+                },
+                {
+                    "name": "ssid",
+                    "env": "JACKPACK_CAPTIVE_PORTAL_SSID",
+                    "label": "Portal SSID",
+                    "type": "text",
+                    "default": "FreeWiFi",
+                    "required": True,
+                    "help": "Name broadcast by the portal AP.",
+                },
+                {
+                    "name": "portal",
+                    "env": "JACKPACK_CAPTIVE_PORTAL_TEMPLATE",
+                    "label": "Portal Template",
+                    "type": "portal_select",
+                    "default": "",
+                    "help": "Use Built-in or a template from config/portal_sites.",
+                },
+            ],
+            "autostart_env": "JACKPACK_CAPTIVE_PORTAL_AUTOSTART",
+        }
+    return None
 
 
 def _load_shared_token() -> str | None:
@@ -2078,6 +2163,9 @@ class JackPackHandler(SimpleHTTPRequestHandler):
             if parsed.path == "/api/payloads/schema":
                 self._handle_payloads_schema(query)
                 return
+            if parsed.path == "/api/payloads/workflow/portals":
+                self._handle_payloads_workflow_portals()
+                return
 
             if parsed.path == "/api/loot/list":
                 self._handle_loot_list(query)
@@ -2417,7 +2505,32 @@ class JackPackHandler(SimpleHTTPRequestHandler):
         schema = _payload_form_schema(target)
         schema["path"] = rel_path
         schema["name"] = Path(rel_path).stem.replace("_", " ").title()
+        workflow = _workflow_schema(rel_path)
+        if workflow:
+            schema["mode"] = "workflow"
+            schema["workflow"] = workflow
+            schema["actions"] = []
         _json_response(self, schema)
+
+    def _handle_payloads_workflow_portals(self) -> None:
+        portals = [{"id": "", "label": "Built-in WiFi Login", "builtin": True}]
+        search_dirs = [PORTAL_SITES_DIR, Path("/root/JackPack/config/portal_sites")]
+        seen = {""}
+        for root in search_dirs:
+            try:
+                if not root.exists() or not root.is_dir():
+                    continue
+                for entry in sorted(root.iterdir(), key=lambda p: p.name.lower()):
+                    if not entry.is_dir() or entry.name.startswith("."):
+                        continue
+                    if entry.name in seen:
+                        continue
+                    if any((entry / name).is_file() for name in ("index.html", "login.html", "index.php")):
+                        seen.add(entry.name)
+                        portals.append({"id": entry.name, "label": entry.name.replace("_", " "), "builtin": False})
+            except Exception:
+                continue
+        _json_response(self, {"ok": True, "portals": portals})
 
     def _handle_payloads_start(self) -> None:
         body = _read_json(self)

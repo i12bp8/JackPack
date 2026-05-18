@@ -43,6 +43,15 @@ class PayloadFormSchemaTests(unittest.TestCase):
         self.assertEqual(labels["KEY3"], "exit")
         self.assertEqual(labels["DOWN"], "Nav")
 
+    def test_known_payloads_have_web_native_workflows(self):
+        deauth = web_server._workflow_schema("wifi/deauth.py")
+        portal = web_server._workflow_schema("wifi/captive_portal.py")
+
+        self.assertEqual(deauth["type"], "wifi_ap_targets")
+        self.assertEqual(deauth["target_env"], "JACKPACK_DEAUTH_TARGETS")
+        self.assertEqual(portal["type"], "captive_portal")
+        self.assertTrue(any(field["type"] == "portal_select" for field in portal["fields"]))
+
     def test_wifi_security_key_mgmt_prefers_wpa2_for_transition_networks(self):
         self.assertEqual(web_server._security_key_mgmt("WPA2", "secret"), "wpa-psk")
         self.assertEqual(web_server._security_key_mgmt("WPA2 WPA3", "secret"), "wpa-psk")
