@@ -300,7 +300,7 @@ def _tailscale_read_status() -> dict:
 def _tailscale_installed() -> bool:
     """Return True if the tailscale CLI appears to be installed."""
     try:
-        return shutil.which("tailscale") is not None
+        return _which("tailscale") is not None
     except Exception:
         return False
 
@@ -694,8 +694,19 @@ def _run_command(args: list[str], timeout: int = 15) -> tuple[int, str, str]:
         return 1, "", str(exc)
 
 
+def _which(cmd: str) -> str | None:
+    path = shutil.which(cmd)
+    if path:
+        return path
+    for base in ("/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin", "/sbin", "/bin"):
+        candidate = Path(base) / cmd
+        if candidate.exists() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
+
+
 def _nmcli_status_by_iface() -> dict[str, dict]:
-    if shutil.which("nmcli") is None:
+    if _which("nmcli") is None:
         return {}
     code, stdout, _ = _run_command(
         ["nmcli", "-t", "-e", "yes", "-f", "DEVICE,TYPE,STATE,CONNECTION", "device", "status"],
@@ -745,7 +756,7 @@ def _network_status() -> dict:
         })
     return {
         "ok": True,
-        "nmcli": shutil.which("nmcli") is not None,
+        "nmcli": _which("nmcli") is not None,
         "ap_iface": ap_iface,
         "attack_iface": attack_iface,
         "interfaces": interfaces,
@@ -755,7 +766,7 @@ def _network_status() -> dict:
 def _wifi_scan(iface: str) -> tuple[bool, dict]:
     if not _valid_iface_name(iface):
         return False, {"error": "invalid interface"}
-    if shutil.which("nmcli") is None:
+    if _which("nmcli") is None:
         return False, {"error": "nmcli is not installed"}
     if not Path(f"/sys/class/net/{iface}").exists():
         return False, {"error": f"{iface} is not present"}
@@ -820,7 +831,7 @@ def _connect_wifi(iface: str, ssid: str, password: str, hidden: bool, force_cont
             "error": "Refusing to change the control AP from the WebUI. Use the external adapter, or enable the force option if you are physically near the Pi.",
             "control_iface": True,
         }
-    if shutil.which("nmcli") is None:
+    if _which("nmcli") is None:
         return False, {"error": "nmcli is not installed"}
     args = ["nmcli", "device", "wifi", "connect", ssid, "ifname", iface]
     if password:
@@ -843,7 +854,7 @@ def _disconnect_iface(iface: str, force_control_iface: bool) -> tuple[bool, dict
             "error": "Refusing to disconnect the control AP from the WebUI.",
             "control_iface": True,
         }
-    if shutil.which("nmcli") is None:
+    if _which("nmcli") is None:
         return False, {"error": "nmcli is not installed"}
     code, stdout, stderr = _run_command(["nmcli", "device", "disconnect", iface], timeout=15)
     if code != 0:
@@ -955,6 +966,69 @@ def _ast_literal(value) -> object | None:
         return None
 
 
+def _ast_eval_static(node, env: dict[str, object] | None = None) -> object | None:
+    env = env or {}
+    literal = _ast_literal(node)
+    if literal is not None:
+        return literal
+    if isinstance(node, ast.Name):
+        return env.get(node.id)
+    if isinstance(node, ast.Dict):
+        keys = [_ast_eval_static(key, env) for key in node.keys]
+        values = [_ast_eval_static(value, env) for value in node.values]
+        if all(key is not None for key in keys):
+            return dict(zip(keys, values))
+        return None
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        items = [_ast_eval_static(item, env) for item in node.elts]
+        if any(item is None for item in items):
+            return None
+        if isinstance(node, ast.Tuple):
+            return tuple(items)
+        if isinstance(node, ast.Set):
+            return set(items)
+        return items
+    if isinstance(node, ast.Call):
+        if isinstance(node.func, ast.Name) and node.func.id in {"list", "tuple", "set", "sorted"} and len(node.args) == 1:
+            value = _ast_eval_static(node.args[0], env)
+            if value is None:
+                return None
+            try:
+                if node.func.id == "list":
+                    return list(value)
+                if node.func.id == "tuple":
+                    return tuple(value)
+                if node.func.id == "set":
+                    return set(value)
+                return sorted(value)
+            except Exception:
+                return None
+        if isinstance(node.func, ast.Attribute) and node.func.attr == "keys" and not node.args:
+            value = _ast_eval_static(node.func.value, env)
+            if isinstance(value, dict):
+                return list(value.keys())
+    return None
+
+
+def _module_literal_env(tree: ast.AST) -> dict[str, object]:
+    env: dict[str, object] = {}
+    if not isinstance(tree, ast.Module):
+        return env
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            value = _ast_eval_static(node.value, env)
+            if value is None:
+                continue
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id.isupper():
+                    env[target.id] = value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id.isupper():
+            value = _ast_eval_static(node.value, env)
+            if value is not None:
+                env[node.target.id] = value
+    return env
+
+
 def _payload_form_schema(path: Path) -> dict:
     meta = _payload_meta(path)
     schema = {
@@ -968,12 +1042,13 @@ def _payload_form_schema(path: Path) -> dict:
         tree = ast.parse(source)
     except Exception:
         return schema
+    literal_env = _module_literal_env(tree)
 
     for node in ast.walk(tree):
         if isinstance(node, (ast.Assign, ast.AnnAssign)):
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
             if any(isinstance(t, ast.Name) and t.id == "JACKPACK_FORM" for t in targets):
-                value = _ast_literal(node.value)
+                value = _ast_eval_static(node.value, literal_env)
                 if isinstance(value, dict):
                     value.setdefault("raw_args", True)
                     value.setdefault("meta", meta)
@@ -1007,7 +1082,7 @@ def _payload_form_schema(path: Path) -> dict:
             key = keyword.arg
             if not key:
                 continue
-            value = _ast_literal(keyword.value)
+            value = _ast_eval_static(keyword.value, literal_env)
             if key == "dest" and isinstance(value, str) and value:
                 field["name"] = value
                 field["label"] = value.replace("_", " ").title()
@@ -1032,6 +1107,18 @@ def _payload_form_schema(path: Path) -> dict:
                     text = value
                 if text in {"int", "float"}:
                     field["type"] = "number"
+        lower_name = str(field.get("name") or "").lower()
+        lower_arg = str(field.get("arg") or "").lower()
+        if any(token in lower_name or token in lower_arg for token in ("iface", "interface")):
+            field["type"] = "interface"
+            if not field.get("default"):
+                field["default"] = _env_first(
+                    "JACKPACK_ATTACK_IFACE",
+                    "PACKJACK_ATTACK_IFACE",
+                    default="wlan1" if meta.get("uses_wifi") else "eth0",
+                )
+        if lower_name in {"port", "lport", "rport"} or lower_name.endswith("_port"):
+            field["type"] = "number"
         fields.append(field)
 
     if fields:
@@ -1204,7 +1291,173 @@ def _git_rev() -> str:
     return stdout.strip() if code == 0 else ""
 
 
-def _run_update_job(restart: bool = False) -> None:
+def _diagnostic_check(
+    key: str,
+    label: str,
+    ok: bool | None,
+    detail: str = "",
+    severity: str = "error",
+) -> dict:
+    if ok is True:
+        status = "pass"
+    elif ok is False:
+        status = "fail" if severity == "error" else "warn"
+    else:
+        status = "warn"
+    return {
+        "key": key,
+        "label": label,
+        "status": status,
+        "detail": detail,
+        "severity": severity,
+    }
+
+
+def _systemctl_state(service: str) -> tuple[str, str]:
+    if _which("systemctl") is None:
+        return "warn", "systemctl unavailable"
+    active_code, active_out, active_err = _run_command(["systemctl", "is-active", service], timeout=8)
+    enabled_code, enabled_out, _ = _run_command(["systemctl", "is-enabled", service], timeout=8)
+    active = active_out.strip() or active_err.strip() or "unknown"
+    enabled = enabled_out.strip() if enabled_code == 0 else "not enabled"
+    state = "pass" if active_code == 0 and active == "active" else "warn"
+    return state, f"{active}, {enabled}"
+
+
+def _git_summary() -> dict:
+    branch_code, branch_out, _ = _run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"], timeout=8)
+    remote_code, remote_out, _ = _run_command(["git", "remote", "get-url", "origin"], timeout=8)
+    status_code, status_out, _ = _run_command(["git", "status", "--short"], timeout=8)
+    return {
+        "branch": branch_out.strip() if branch_code == 0 else "",
+        "origin": remote_out.strip() if remote_code == 0 else "",
+        "dirty": bool(status_out.strip()) if status_code == 0 else None,
+        "status": status_out.strip(),
+        "rev": _git_rev(),
+    }
+
+
+def _pi_model() -> str:
+    for path in (Path("/proc/device-tree/model"), Path("/sys/firmware/devicetree/base/model")):
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore").replace("\x00", "").strip()
+            if text:
+                return text
+        except Exception:
+            pass
+    return ""
+
+
+def _system_diagnostics() -> dict:
+    checks: list[dict] = []
+    model = _pi_model()
+    checks.append(_diagnostic_check(
+        "pi_model",
+        "Raspberry Pi 5 model",
+        None if not model else ("Raspberry Pi 5" in model),
+        model or "Not running on Pi hardware or model unavailable",
+        severity="warning",
+    ))
+    checks.append(_diagnostic_check(
+        "root",
+        "Running with required privileges",
+        os.geteuid() == 0,
+        "root" if os.geteuid() == 0 else f"uid {os.geteuid()}",
+        severity="error",
+    ))
+    env_path = _runtime_env_path()
+    checks.append(_diagnostic_check(
+        "env_file",
+        "Runtime config file",
+        env_path.exists(),
+        str(env_path),
+        severity="error",
+    ))
+    checks.append(_diagnostic_check(
+        "auth",
+        "WebUI authentication initialized",
+        _auth_initialized(),
+        str(AUTH_FILE),
+        severity="error",
+    ))
+
+    required_commands = [
+        "nmcli", "ip", "iw", "git", "systemctl", "nmap", "tcpdump",
+        "tshark", "airmon-ng", "airodump-ng", "hostapd", "dnsmasq",
+        "avahi-daemon",
+    ]
+    for cmd in required_commands:
+        path = _which(cmd)
+        severity = "error" if cmd in {"nmcli", "ip", "git"} else "warning"
+        checks.append(_diagnostic_check(
+            f"cmd_{cmd}",
+            f"Command available: {cmd}",
+            bool(path),
+            path or "missing",
+            severity=severity,
+        ))
+
+    for service in ("packjack-ap.service", "packjack-web.service", "packjack-ws.service", "packjack-pin-wifi.service", "avahi-daemon.service"):
+        state, detail = _systemctl_state(service)
+        checks.append({
+            "key": f"svc_{service}",
+            "label": f"Service: {service}",
+            "status": state,
+            "detail": detail,
+            "severity": "warning" if service == "avahi-daemon.service" else "error",
+        })
+
+    net = _network_status()
+    iface_map = {item.get("role"): item for item in net.get("interfaces", [])}
+    for role, label, severity in (
+        ("control_ap", "Control AP interface", "error"),
+        ("attack_wifi", "External payload WiFi interface", "warning"),
+        ("wired_target", "Built-in Ethernet interface", "warning"),
+    ):
+        item = iface_map.get(role) or {}
+        checks.append(_diagnostic_check(
+            f"iface_{role}",
+            label,
+            bool(item.get("present")),
+            f"{item.get('name') or '-'} · {item.get('state') or 'missing'}",
+            severity=severity,
+        ))
+
+    git_info = _git_summary()
+    checks.append(_diagnostic_check(
+        "git_origin",
+        "GitHub origin configured",
+        bool(git_info.get("origin")),
+        git_info.get("origin") or "missing",
+        severity="warning",
+    ))
+    checks.append(_diagnostic_check(
+        "git_clean",
+        "Git tree clean for auto-update",
+        git_info.get("dirty") is False,
+        "dirty working tree" if git_info.get("dirty") else "clean",
+        severity="warning",
+    ))
+
+    counts = {
+        "pass": sum(1 for item in checks if item.get("status") == "pass"),
+        "warn": sum(1 for item in checks if item.get("status") == "warn"),
+        "fail": sum(1 for item in checks if item.get("status") == "fail"),
+    }
+    ready = counts["fail"] == 0
+    return {
+        "ok": True,
+        "ready": ready,
+        "counts": counts,
+        "checks": checks,
+        "network": net,
+        "git": git_info,
+        "update": _read_update_status(),
+        "web": _read_headless_status().get("web", {}),
+    }
+
+
+def _run_update_job(restart: bool = False, apply_installer: bool = False) -> None:
     if not _UPDATE_LOCK.acquire(blocking=False):
         return
     output: list[str] = []
@@ -1222,10 +1475,13 @@ def _run_update_job(restart: bool = False) -> None:
             ["git", "fetch", "origin", "main", "--prune"],
             ["git", "pull", "--ff-only", "origin", "main"],
         ]
+        if apply_installer:
+            steps.append(["bash", "scripts/install_packjack_rpi5.sh", "--non-interactive", "--no-packages"])
         ok = True
         for args in steps:
             output.append(f"$ {' '.join(args)}")
-            code, stdout, stderr = _run_command(args, timeout=180)
+            timeout = 420 if args[:2] == ["bash", "scripts/install_packjack_rpi5.sh"] else 180
+            code, stdout, stderr = _run_command(args, timeout=timeout)
             if stdout.strip():
                 output.append(stdout.strip())
             if stderr.strip():
@@ -1241,7 +1497,7 @@ def _run_update_job(restart: bool = False) -> None:
                 "output": "\n".join(output)[-8000:],
             })
         rev_after = _git_rev()
-        if ok and restart and shutil.which("systemctl"):
+        if ok and restart and _which("systemctl"):
             output.append("$ systemctl restart packjack-web.service packjack-ws.service")
             subprocess.Popen(["systemctl", "restart", "packjack-web.service", "packjack-ws.service"])
         _write_update_status({
@@ -1251,7 +1507,7 @@ def _run_update_job(restart: bool = False) -> None:
             "finished_at": time.time(),
             "rev_before": rev_before,
             "rev_after": rev_after,
-            "message": "Updated. Restart the WebUI if files changed." if ok else "Update failed.",
+            "message": "Updated and applied. Restart or reboot if services changed." if ok and apply_installer else ("Updated. Restart the WebUI if files changed." if ok else "Update failed."),
             "output": "\n".join(output)[-12000:],
         })
     finally:
@@ -1585,6 +1841,9 @@ class JackPackHandler(SimpleHTTPRequestHandler):
 
             if parsed.path == "/api/system/status":
                 self._handle_system_status()
+                return
+            if parsed.path == "/api/system/diagnostics":
+                self._handle_system_diagnostics()
                 return
             if parsed.path == "/api/system/update-status":
                 self._handle_system_update_status()
@@ -2455,6 +2714,9 @@ class JackPackHandler(SimpleHTTPRequestHandler):
     def _handle_system_update_status(self) -> None:
         _json_response(self, _read_update_status())
 
+    def _handle_system_diagnostics(self) -> None:
+        _json_response(self, _system_diagnostics())
+
     def _handle_system_update(self) -> None:
         body = _read_json(self)
         if body is None:
@@ -2464,6 +2726,7 @@ class JackPackHandler(SimpleHTTPRequestHandler):
             _json_response(self, {"error": "update already running"}, status=HTTPStatus.CONFLICT)
             return
         restart = bool(body.get("restart"))
+        apply_installer = bool(body.get("apply_installer"))
         _write_update_status({
             "running": True,
             "ok": None,
@@ -2471,7 +2734,11 @@ class JackPackHandler(SimpleHTTPRequestHandler):
             "message": "Update queued.",
             "output": "",
         })
-        threading.Thread(target=_run_update_job, kwargs={"restart": restart}, daemon=True).start()
+        threading.Thread(
+            target=_run_update_job,
+            kwargs={"restart": restart, "apply_installer": apply_installer},
+            daemon=True,
+        ).start()
         _json_response(self, {"ok": True, "running": True})
 
     def _client_ip(self) -> str:

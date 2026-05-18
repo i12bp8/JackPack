@@ -362,6 +362,91 @@ a.ide-toolbar-btn {
   white-space: nowrap;
 }
 
+.jp-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.65rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.38);
+  color: #cbd5e1;
+  padding: 0.22rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.jp-pill-pass {
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #a7f3d0;
+}
+
+.jp-pill-warn {
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fde68a;
+}
+
+.jp-pill-fail {
+  border-color: rgba(244, 63, 94, 0.38);
+  color: #fecdd3;
+}
+
+.jp-diag-list {
+  display: grid;
+  gap: 0.45rem;
+  max-height: 26rem;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.jp-diag-row {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: start;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.34);
+  padding: 0.68rem;
+}
+
+.jp-diag-icon {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.08);
+  font-size: 0.75rem;
+}
+
+.jp-diag-label {
+  color: #e2e8f0;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.jp-diag-detail {
+  margin-top: 0.1rem;
+  color: #64748b;
+  font-size: 0.7rem;
+  overflow-wrap: anywhere;
+}
+
+.jp-diag-pass .jp-diag-icon {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.jp-diag-warn .jp-diag-icon {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.jp-diag-fail .jp-diag-icon {
+  color: #fb7185;
+  background: rgba(244, 63, 94, 0.12);
+}
+
 .jp-console-panel {
   margin-top: 1rem;
 }
@@ -614,6 +699,9 @@ header .text-\[10px\],
     grid-template-columns: 1fr;
   }
   .jp-network-list {
+    max-height: 42vh;
+  }
+  .jp-diag-list {
     max-height: 42vh;
   }
   .jp-iface-row,

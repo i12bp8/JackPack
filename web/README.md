@@ -19,6 +19,7 @@ Served by `web_server.py`:
 
 - `/api/headless/status`
 - `/api/system/status`
+- `/api/system/diagnostics`
 - `/api/system/update-status`
 - `/api/system/update`
 - `/api/network/status`

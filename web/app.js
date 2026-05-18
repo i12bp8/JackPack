@@ -127,7 +127,12 @@
   const updateStatus = document.getElementById("updateStatus");
   const updateOutput = document.getElementById("updateOutput");
   const updatePull = document.getElementById("updatePull");
+  const updateApply = document.getElementById("updateApply");
   const updateRestart = document.getElementById("updateRestart");
+  const diagnosticsStatus = document.getElementById("diagnosticsStatus");
+  const diagnosticsRun = document.getElementById("diagnosticsRun");
+  const diagnosticsList = document.getElementById("diagnosticsList");
+  const diagnosticsSummary = document.getElementById("diagnosticsSummary");
   const discordWebhookInput = document.getElementById("discordWebhookInput");
   const discordWebhookSave = document.getElementById("discordWebhookSave");
   const discordWebhookClear = document.getElementById("discordWebhookClear");
@@ -725,6 +730,13 @@
     if (updateStatus) {
       updateStatus.textContent = txt;
       applyStatusTone(updateStatus, txt);
+    }
+  }
+
+  function setDiagnosticsStatus(txt) {
+    if (diagnosticsStatus) {
+      diagnosticsStatus.textContent = txt;
+      applyStatusTone(diagnosticsStatus, txt);
     }
   }
 
@@ -1579,13 +1591,13 @@
     }
   }
 
-  async function startUpdate() {
+  async function startUpdate(applyInstaller = false) {
     setUpdateStatus("Starting...");
     try {
       const res = await apiFetch(getApiUrl("/api/system/update"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ restart: false }),
+        body: JSON.stringify({ restart: false, apply_installer: !!applyInstaller }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "update_failed");
@@ -1616,6 +1628,56 @@
       setUpdateStatus("Restart requested");
     } catch (e) {
       setUpdateStatus(e && e.message ? e.message : "Restart failed");
+    }
+  }
+
+  function diagnosticClasses(status) {
+    if (status === "pass") return "jp-diag-pass";
+    if (status === "fail") return "jp-diag-fail";
+    return "jp-diag-warn";
+  }
+
+  function renderDiagnostics(data) {
+    const counts = (data && data.counts) || {};
+    if (diagnosticsSummary) {
+      diagnosticsSummary.innerHTML = `
+        <span class="jp-pill jp-pill-pass">${Number(counts.pass || 0)} pass</span>
+        <span class="jp-pill jp-pill-warn">${Number(counts.warn || 0)} warn</span>
+        <span class="jp-pill jp-pill-fail">${Number(counts.fail || 0)} fail</span>
+      `;
+    }
+    if (diagnosticsList) {
+      const checks = Array.isArray(data?.checks) ? data.checks : [];
+      diagnosticsList.innerHTML = checks.length
+        ? checks
+            .map((check) => {
+              const status = String(check.status || "warn");
+              const icon = status === "pass" ? "check" : status === "fail" ? "xmark" : "triangle-exclamation";
+              return `<div class="jp-diag-row ${diagnosticClasses(status)}">
+                <div class="jp-diag-icon"><i class="fa-solid fa-${icon}"></i></div>
+                <div class="min-w-0">
+                  <div class="jp-diag-label">${escapeHtml(check.label || check.key || "Check")}</div>
+                  <div class="jp-diag-detail">${escapeHtml(check.detail || "")}</div>
+                </div>
+              </div>`;
+            })
+            .join("")
+        : '<div class="text-xs text-slate-500">No diagnostics loaded yet.</div>';
+    }
+    setDiagnosticsStatus(data && data.ready ? "Ready" : "Needs attention");
+  }
+
+  async function loadDiagnostics() {
+    if (!diagnosticsStatus) return;
+    setDiagnosticsStatus("Checking...");
+    try {
+      const res = await apiFetch(getApiUrl("/api/system/diagnostics"), { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "diagnostics_failed");
+      renderDiagnostics(data);
+    } catch (e) {
+      setDiagnosticsStatus("Unavailable");
+      if (diagnosticsList) diagnosticsList.innerHTML = '<div class="text-xs text-rose-300">Diagnostics unavailable.</div>';
     }
   }
 
@@ -2474,6 +2536,23 @@
               <span><strong>${label}</strong>${help}</span>
             </label>`;
           }
+          if (field.type === "interface") {
+            const interfaces = (networkState.interfaces || []).filter((item) => item.present || item.recommended || item.protected);
+            const options = interfaces.length
+              ? interfaces.map((item) => {
+                  const value = String(item.name || "");
+                  const selected = value === def ? "selected" : "";
+                  return `<option value="${escapeHtml(value)}" ${selected}>${escapeHtml(ifaceLabel(item))}</option>`;
+                }).join("")
+              : `<option value="${escapeHtml(def || "wlan1")}">${escapeHtml(def || "wlan1")}</option>`;
+            return `<label class="jp-field">
+              <span>${label}</span>
+              <select data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${required}>
+                ${options}
+              </select>
+              ${help}
+            </label>`;
+          }
           if (field.type === "select" && Array.isArray(field.choices)) {
             return `<label class="jp-field">
               <span>${label}</span>
@@ -2502,6 +2581,9 @@
       payloadLaunchForm.innerHTML = '<div class="jp-empty-form">Loading options...</div>';
     }
     try {
+      if (!networkState.interfaces.length) {
+        await loadNetworkStatus();
+      }
       const res = await apiFetch(getApiUrl("/api/payloads/schema", { path }), { cache: "no-store" });
       const schema = await res.json();
       if (!res.ok) throw new Error(schema && schema.error ? schema.error : "schema_failed");
@@ -2766,6 +2848,7 @@
       setActiveTab("settings");
       loadRuntimeConfig();
       loadUpdateStatus();
+      loadDiagnostics();
       loadDiscordWebhook();
       loadWigleSettings();
       loadTailscaleSettings();
@@ -2779,6 +2862,7 @@
       if (tab === "settings") {
         loadRuntimeConfig();
         loadUpdateStatus();
+        loadDiagnostics();
         loadDiscordWebhook();
         loadWigleSettings();
         loadTailscaleSettings();
@@ -2905,9 +2989,13 @@
   if (configSave)
     configSave.addEventListener("click", saveRuntimeConfig);
   if (updatePull)
-    updatePull.addEventListener("click", startUpdate);
+    updatePull.addEventListener("click", () => startUpdate(false));
+  if (updateApply)
+    updateApply.addEventListener("click", () => startUpdate(true));
   if (updateRestart)
     updateRestart.addEventListener("click", restartWebUi);
+  if (diagnosticsRun)
+    diagnosticsRun.addEventListener("click", loadDiagnostics);
   if (discordWebhookSave)
     discordWebhookSave.addEventListener("click", () => {
       saveDiscordWebhook(discordWebhookInput ? discordWebhookInput.value : "");

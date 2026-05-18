@@ -504,9 +504,29 @@
             </div>
             <div class="flex flex-wrap gap-2">
               <button id="updatePull" type="button" class="jp-btn jp-btn-primary"><i class="fa-solid fa-cloud-arrow-down"></i> Pull Latest</button>
+              <button id="updateApply" type="button" class="jp-btn"><i class="fa-solid fa-screwdriver-wrench"></i> Pull + Apply Services</button>
               <button id="updateRestart" type="button" class="jp-btn jp-btn-muted"><i class="fa-solid fa-power-off"></i> Restart WebUI</button>
             </div>
             <pre id="updateOutput" class="jp-log mt-3 min-h-[8rem] max-h-[14rem]">No update run yet.</pre>
+          </div>
+
+          <div class="rounded-xl border border-slate-800/70 bg-slate-950/40 p-3">
+            <div class="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <div class="text-xs font-semibold text-slate-200">Field Diagnostics</div>
+                <div class="text-[11px] text-slate-500">Checks Pi model, services, tools, interfaces, config, auth, and Git update readiness.</div>
+              </div>
+              <div id="diagnosticsStatus" class="text-[11px] text-slate-400">Ready</div>
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div id="diagnosticsSummary" class="flex flex-wrap gap-2">
+                <span class="jp-pill">No run yet</span>
+              </div>
+              <button id="diagnosticsRun" type="button" class="jp-btn"><i class="fa-solid fa-stethoscope"></i> Run Checks</button>
+            </div>
+            <div id="diagnosticsList" class="jp-diag-list mt-3">
+              <div class="text-xs text-slate-500">No diagnostics loaded yet.</div>
+            </div>
           </div>
 
           <div class="rounded-xl border border-slate-800/70 bg-slate-950/40 p-3">

@@ -51,6 +51,7 @@ The goal is simple: no tiny screen, no button choreography, no web page pretendi
 - **Mobile wardriving map:** clustered map and phone-friendly network list.
 - **Browser terminal:** on-demand WebSocket shell bridge for field control.
 - **WebUI updater:** pull the latest `origin/main` from the browser, then restart the WebUI.
+- **Field diagnostics:** browser-based checks for services, dependencies, interfaces, config, auth, and Git readiness.
 - **Clean installer:** interactive or scripted setup for AP name, AP password, hostname, ports, and interface roles.
 
 ## Getting Started
@@ -113,7 +114,8 @@ The installer configures the Pi 5 for the intended JackPack layout:
 - **Dashboard:** payload launchpad, active payload state, logs, and on-demand terminal.
 - **Connect:** pick `wlan0` or `wlan1`, scan nearby WiFi, connect to open or secured networks, and disconnect safely. JackPack blocks control-AP changes unless you explicitly allow them.
 - **Config:** edit AP SSID, AP password, hostname, interface roles, and service ports from the browser.
-- **Updater:** fast-forward pull from GitHub and restart the WebUI after updating.
+- **Updater:** fast-forward pull from GitHub, optionally re-apply JackPack services, and restart the WebUI after updating.
+- **Diagnostics:** run a field-readiness check before an engagement or after swapping adapters.
 
 ## Project Layout
 
