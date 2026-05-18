@@ -27,12 +27,14 @@ Environment:
 
 from __future__ import annotations
 
+import ast
 import json
 import base64
 import hmac
 import hashlib
 import mimetypes
 import os
+import re
 import secrets
 import shutil
 import socket
@@ -73,6 +75,26 @@ WS_TICKET_TTL_SECONDS = int(os.environ.get("RJ_WEB_WS_TICKET_TTL", "120"))
 TAILSCALE_KEY_PATH = ROOT_DIR / ".tailscale_auth_key"
 TAILSCALE_STATUS_PATH = Path("/dev/shm/rj_tailscale_status.json")
 PAYLOAD_LOG_PATH = LOOT_DIR / "payload.log"
+PACKJACK_ENV_PATH = Path(os.environ.get("JACKPACK_ENV_FILE", "/etc/packjack/packjack.env"))
+PACKJACK_ENV_FALLBACK_PATH = ROOT_DIR / ".packjack.env"
+UPDATE_STATUS_PATH = Path(os.environ.get("JACKPACK_UPDATE_STATUS_PATH", "/dev/shm/jackpack_update_status.json"))
+
+_UPDATE_LOCK = threading.Lock()
+_IFACE_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,32}$")
+_HOSTNAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+_ALLOWED_RUNTIME_CONFIG = {
+    "JACKPACK_AP_IFACE",
+    "JACKPACK_AP_SSID",
+    "JACKPACK_AP_PASSWORD",
+    "JACKPACK_AP_ADDRESS",
+    "JACKPACK_AP_CHANNEL",
+    "JACKPACK_ATTACK_IFACE",
+    "JACKPACK_WIRED_IFACE",
+    "JACKPACK_HOSTNAME",
+    "RJ_WEB_PORT",
+    "RJ_WS_PORT",
+}
+_SENSITIVE_RUNTIME_CONFIG = {"JACKPACK_AP_PASSWORD"}
 
 
 def _load_shared_token() -> str | None:
@@ -605,6 +627,230 @@ def _iface_role(name: str) -> str:
     return "network"
 
 
+def _valid_iface_name(value: str) -> bool:
+    return bool(_IFACE_RE.match(str(value or "")))
+
+
+def _configured_iface_names(include_missing: bool = True) -> list[str]:
+    names: list[str] = []
+    for value in (
+        _env_first("JACKPACK_AP_IFACE", "PACKJACK_AP_IFACE", default="wlan0"),
+        _env_first("JACKPACK_ATTACK_IFACE", "PACKJACK_ATTACK_IFACE", default="wlan1"),
+        _env_first("JACKPACK_WIRED_IFACE", "PACKJACK_WIRED_IFACE", default="eth0"),
+    ):
+        if value and value not in names:
+            names.append(value)
+    try:
+        for item in sorted(Path("/sys/class/net").iterdir()):
+            name = item.name
+            if name == "lo" or name in names:
+                continue
+            if include_missing or item.exists():
+                names.append(name)
+    except Exception:
+        pass
+    return names
+
+
+def _is_wireless_iface(iface: str) -> bool:
+    try:
+        return Path(f"/sys/class/net/{iface}/wireless").is_dir()
+    except Exception:
+        return False
+
+
+def _nmcli_split(line: str) -> list[str]:
+    parts: list[str] = []
+    buf: list[str] = []
+    escaped = False
+    for char in line:
+        if escaped:
+            buf.append(char)
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif char == ":":
+            parts.append("".join(buf))
+            buf = []
+        else:
+            buf.append(char)
+    parts.append("".join(buf))
+    return parts
+
+
+def _run_command(args: list[str], timeout: int = 15) -> tuple[int, str, str]:
+    try:
+        res = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(ROOT_DIR),
+        )
+        return res.returncode, res.stdout or "", res.stderr or ""
+    except subprocess.TimeoutExpired as exc:
+        return 124, exc.stdout or "", exc.stderr or "command timed out"
+    except Exception as exc:
+        return 1, "", str(exc)
+
+
+def _nmcli_status_by_iface() -> dict[str, dict]:
+    if shutil.which("nmcli") is None:
+        return {}
+    code, stdout, _ = _run_command(
+        ["nmcli", "-t", "-e", "yes", "-f", "DEVICE,TYPE,STATE,CONNECTION", "device", "status"],
+        timeout=8,
+    )
+    if code != 0:
+        return {}
+    status: dict[str, dict] = {}
+    for line in stdout.splitlines():
+        parts = _nmcli_split(line)
+        if len(parts) < 4:
+            continue
+        iface, kind, state, connection = parts[:4]
+        if iface:
+            status[iface] = {
+                "type": kind,
+                "state": state,
+                "connection": connection,
+            }
+    return status
+
+
+def _network_status() -> dict:
+    nm = _nmcli_status_by_iface()
+    ipv4 = {item.get("name"): item.get("ipv4") for item in _read_ipv4_interfaces()}
+    headless = _read_headless_status()
+    ap_iface = str((headless.get("ap") or {}).get("iface") or "wlan0")
+    attack_iface = str((headless.get("attack") or {}).get("iface") or "wlan1")
+    interfaces = []
+    for name in _configured_iface_names(include_missing=True):
+        if not _valid_iface_name(name):
+            continue
+        role = _iface_role(name)
+        present = Path(f"/sys/class/net/{name}").exists()
+        info = nm.get(name, {})
+        interfaces.append({
+            "name": name,
+            "role": role,
+            "present": present,
+            "wireless": _is_wireless_iface(name),
+            "protected": name == ap_iface,
+            "recommended": name == attack_iface,
+            "ipv4": ipv4.get(name) or None,
+            "state": info.get("state") or ("unavailable" if not present else "unknown"),
+            "connection": info.get("connection") or "",
+            "type": info.get("type") or ("wifi" if _is_wireless_iface(name) or role in {"control_ap", "attack_wifi", "wifi"} else "ethernet"),
+        })
+    return {
+        "ok": True,
+        "nmcli": shutil.which("nmcli") is not None,
+        "ap_iface": ap_iface,
+        "attack_iface": attack_iface,
+        "interfaces": interfaces,
+    }
+
+
+def _wifi_scan(iface: str) -> tuple[bool, dict]:
+    if not _valid_iface_name(iface):
+        return False, {"error": "invalid interface"}
+    if shutil.which("nmcli") is None:
+        return False, {"error": "nmcli is not installed"}
+    if not Path(f"/sys/class/net/{iface}").exists():
+        return False, {"error": f"{iface} is not present"}
+    if not _is_wireless_iface(iface):
+        return False, {"error": f"{iface} is not a WiFi interface"}
+    code, stdout, stderr = _run_command(
+        [
+            "nmcli",
+            "-t",
+            "-e",
+            "yes",
+            "-f",
+            "SSID,SECURITY,SIGNAL,CHAN,BSSID",
+            "device",
+            "wifi",
+            "list",
+            "ifname",
+            iface,
+            "--rescan",
+            "yes",
+        ],
+        timeout=20,
+    )
+    if code != 0:
+        return False, {"error": (stderr or stdout or "scan failed").strip()}
+    seen: set[str] = set()
+    networks = []
+    for line in stdout.splitlines():
+        parts = _nmcli_split(line)
+        if len(parts) < 5:
+            continue
+        ssid, security, signal, channel, bssid = parts[:5]
+        key = bssid or f"{ssid}:{security}:{channel}"
+        if key in seen:
+            continue
+        seen.add(key)
+        security = security.strip()
+        networks.append({
+            "ssid": ssid,
+            "security": security,
+            "open": not security or security == "--",
+            "signal": int(signal) if str(signal).isdigit() else None,
+            "channel": channel,
+            "bssid": bssid,
+        })
+    networks.sort(key=lambda item: (item.get("signal") is None, -(item.get("signal") or 0), item.get("ssid") or ""))
+    return True, {"ok": True, "iface": iface, "networks": networks}
+
+
+def _connect_wifi(iface: str, ssid: str, password: str, hidden: bool, force_control_iface: bool) -> tuple[bool, dict]:
+    if not _valid_iface_name(iface):
+        return False, {"error": "invalid interface"}
+    ssid = str(ssid or "").strip()
+    if not ssid:
+        return False, {"error": "ssid is required"}
+    if len(ssid.encode("utf-8", "ignore")) > 128:
+        return False, {"error": "ssid is too long"}
+    status = _network_status()
+    ap_iface = status.get("ap_iface")
+    if iface == ap_iface and not force_control_iface:
+        return False, {
+            "error": "Refusing to change the control AP from the WebUI. Use the external adapter, or enable the force option if you are physically near the Pi.",
+            "control_iface": True,
+        }
+    if shutil.which("nmcli") is None:
+        return False, {"error": "nmcli is not installed"}
+    args = ["nmcli", "device", "wifi", "connect", ssid, "ifname", iface]
+    if password:
+        args.extend(["password", password])
+    if hidden:
+        args.extend(["hidden", "yes"])
+    code, stdout, stderr = _run_command(args, timeout=35)
+    if code != 0:
+        return False, {"error": (stderr or stdout or "connect failed").strip()}
+    return True, {"ok": True, "message": stdout.strip(), "status": _network_status()}
+
+
+def _disconnect_iface(iface: str, force_control_iface: bool) -> tuple[bool, dict]:
+    if not _valid_iface_name(iface):
+        return False, {"error": "invalid interface"}
+    status = _network_status()
+    ap_iface = status.get("ap_iface")
+    if iface == ap_iface and not force_control_iface:
+        return False, {
+            "error": "Refusing to disconnect the control AP from the WebUI.",
+            "control_iface": True,
+        }
+    if shutil.which("nmcli") is None:
+        return False, {"error": "nmcli is not installed"}
+    code, stdout, stderr = _run_command(["nmcli", "device", "disconnect", iface], timeout=15)
+    if code != 0:
+        return False, {"error": (stderr or stdout or "disconnect failed").strip()}
+    return True, {"ok": True, "message": stdout.strip(), "status": _network_status()}
+
+
 def _read_headless_status() -> dict:
     interfaces = _read_ipv4_interfaces()
     for iface in interfaces:
@@ -700,6 +946,316 @@ def _payload_meta(path: Path) -> dict:
     if meta["needs_display"]:
         meta["tags"].append("lcd-compat")
     return meta
+
+
+def _ast_literal(value) -> object | None:
+    try:
+        return ast.literal_eval(value)
+    except Exception:
+        return None
+
+
+def _payload_form_schema(path: Path) -> dict:
+    meta = _payload_meta(path)
+    schema = {
+        "mode": "args",
+        "fields": [],
+        "raw_args": True,
+        "meta": meta,
+    }
+    try:
+        source = path.read_text(encoding="utf-8", errors="ignore")
+        tree = ast.parse(source)
+    except Exception:
+        return schema
+
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            if any(isinstance(t, ast.Name) and t.id == "JACKPACK_FORM" for t in targets):
+                value = _ast_literal(node.value)
+                if isinstance(value, dict):
+                    value.setdefault("raw_args", True)
+                    value.setdefault("meta", meta)
+                    return value
+
+    fields: list[dict] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not (isinstance(func, ast.Attribute) and func.attr == "add_argument"):
+            continue
+        option_strings = [
+            arg.value for arg in node.args
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str)
+        ]
+        if not option_strings:
+            continue
+        long_option = next((item for item in option_strings if item.startswith("--")), option_strings[0])
+        dest = long_option.lstrip("-").replace("-", "_")
+        field = {
+            "name": dest,
+            "arg": long_option,
+            "label": dest.replace("_", " ").title(),
+            "type": "text",
+            "required": False,
+            "default": "",
+            "help": "",
+        }
+        for keyword in node.keywords:
+            key = keyword.arg
+            if not key:
+                continue
+            value = _ast_literal(keyword.value)
+            if key == "dest" and isinstance(value, str) and value:
+                field["name"] = value
+                field["label"] = value.replace("_", " ").title()
+            elif key == "required":
+                field["required"] = bool(value)
+            elif key == "default" and value is not None:
+                field["default"] = str(value)
+            elif key == "help" and isinstance(value, str):
+                field["help"] = value
+            elif key == "choices" and isinstance(value, (list, tuple)):
+                field["type"] = "select"
+                field["choices"] = [str(item) for item in value]
+            elif key == "action" and value in {"store_true", "store_false"}:
+                field["type"] = "checkbox"
+                field["checked_value"] = value
+                field["default"] = value == "store_false"
+            elif key == "type":
+                text = ""
+                if isinstance(keyword.value, ast.Name):
+                    text = keyword.value.id
+                elif isinstance(value, str):
+                    text = value
+                if text in {"int", "float"}:
+                    field["type"] = "number"
+        fields.append(field)
+
+    if fields:
+        schema.update({
+            "mode": "form",
+            "fields": fields,
+            "raw_args": True,
+        })
+    return schema
+
+
+def _runtime_env_path() -> Path:
+    if PACKJACK_ENV_PATH.exists() or os.geteuid() == 0:
+        return PACKJACK_ENV_PATH
+    return PACKJACK_ENV_FALLBACK_PATH
+
+
+def _read_env_values(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    try:
+        if not path.exists():
+            return values
+        for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if key:
+                values[key] = value.strip().strip('"').strip("'")
+    except Exception:
+        pass
+    return values
+
+
+def _runtime_config_payload() -> dict:
+    path = _runtime_env_path()
+    file_values = _read_env_values(path)
+    defaults = {
+        "JACKPACK_AP_IFACE": "wlan0",
+        "JACKPACK_AP_SSID": "JackPack",
+        "JACKPACK_AP_PASSWORD": "",
+        "JACKPACK_AP_ADDRESS": "10.66.0.1/24",
+        "JACKPACK_AP_CHANNEL": "6",
+        "JACKPACK_ATTACK_IFACE": "wlan1",
+        "JACKPACK_WIRED_IFACE": "eth0",
+        "JACKPACK_HOSTNAME": "jackpack",
+        "RJ_WEB_PORT": str(PORT),
+        "RJ_WS_PORT": os.environ.get("RJ_WS_PORT", "8765"),
+    }
+    values = {}
+    for key in sorted(_ALLOWED_RUNTIME_CONFIG):
+        value = file_values.get(key, os.environ.get(key, defaults.get(key, "")))
+        values[key] = str(value)
+    masked = {
+        key: (_mask_secret(value) if key in _SENSITIVE_RUNTIME_CONFIG else value)
+        for key, value in values.items()
+    }
+    return {
+        "ok": True,
+        "path": str(path),
+        "exists": path.exists(),
+        "values": masked,
+        "configured": {key: bool(values.get(key)) for key in _SENSITIVE_RUNTIME_CONFIG},
+    }
+
+
+def _validate_runtime_config(updates: dict[str, str]) -> tuple[bool, str]:
+    for key, value in updates.items():
+        if key not in _ALLOWED_RUNTIME_CONFIG:
+            return False, f"{key} is not editable"
+        if key.endswith("_IFACE") and not _valid_iface_name(value):
+            return False, f"{key} is not a valid interface name"
+    hostname = updates.get("JACKPACK_HOSTNAME")
+    if hostname:
+        normalized = hostname.lower().removesuffix(".local")
+        if not _HOSTNAME_RE.match(normalized):
+            return False, "hostname must be a valid single-label mDNS name"
+        updates["JACKPACK_HOSTNAME"] = normalized
+    password = updates.get("JACKPACK_AP_PASSWORD")
+    if password is not None and password and len(password) < 8:
+        return False, "AP password must be at least 8 characters"
+    for port_key in ("RJ_WEB_PORT", "RJ_WS_PORT"):
+        if port_key in updates:
+            try:
+                port = int(updates[port_key])
+                if port < 1 or port > 65535:
+                    raise ValueError
+            except Exception:
+                return False, f"{port_key} must be a port between 1 and 65535"
+    if "JACKPACK_AP_CHANNEL" in updates:
+        try:
+            channel = int(updates["JACKPACK_AP_CHANNEL"])
+            if channel < 1 or channel > 165:
+                raise ValueError
+        except Exception:
+            return False, "AP channel must be 1-165"
+    if "JACKPACK_AP_ADDRESS" in updates and "/" not in updates["JACKPACK_AP_ADDRESS"]:
+        return False, "AP address must include CIDR, for example 10.66.0.1/24"
+    return True, "ok"
+
+
+def _write_runtime_config(updates: dict[str, str]) -> tuple[bool, str]:
+    clean = {
+        str(key): str(value).strip()
+        for key, value in updates.items()
+        if str(key) in _ALLOWED_RUNTIME_CONFIG and str(value).strip() != ""
+    }
+    ok, msg = _validate_runtime_config(clean)
+    if not ok:
+        return False, msg
+    if "JACKPACK_AP_IFACE" in clean or "JACKPACK_WIRED_IFACE" in clean:
+        current = _read_env_values(_runtime_env_path())
+        wired = clean.get("JACKPACK_WIRED_IFACE") or current.get("JACKPACK_WIRED_IFACE") or "eth0"
+        ap = clean.get("JACKPACK_AP_IFACE") or current.get("JACKPACK_AP_IFACE") or "wlan0"
+        clean["RJ_WEBUI_INTERFACES"] = f"{wired},{ap},tailscale0"
+
+    path = _runtime_env_path()
+    try:
+        old_lines = path.read_text(encoding="utf-8", errors="ignore").splitlines() if path.exists() else [
+            "# JackPack runtime configuration",
+            "# Edited by the WebUI",
+            "",
+        ]
+        seen: set[str] = set()
+        new_lines: list[str] = []
+        for raw in old_lines:
+            stripped = raw.strip()
+            if stripped and not stripped.startswith("#") and "=" in stripped:
+                key = stripped.split("=", 1)[0].strip()
+                if key in clean:
+                    new_lines.append(f"{key}={clean[key]}")
+                    seen.add(key)
+                    continue
+            new_lines.append(raw)
+        for key in sorted(clean):
+            if key not in seen:
+                new_lines.append(f"{key}={clean[key]}")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text("\n".join(new_lines).rstrip() + "\n", encoding="utf-8")
+        os.chmod(tmp, 0o600)
+        tmp.replace(path)
+        return True, "saved"
+    except Exception as exc:
+        return False, f"write error: {exc}"
+
+
+def _write_update_status(payload: dict) -> None:
+    data = {"ts": time.time(), **payload}
+    try:
+        UPDATE_STATUS_PATH.write_text(json.dumps(data), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _read_update_status() -> dict:
+    try:
+        if not UPDATE_STATUS_PATH.exists():
+            return {"running": False, "ok": None, "message": "No update run yet."}
+        raw = UPDATE_STATUS_PATH.read_text(encoding="utf-8")
+        data = json.loads(raw) if raw else {}
+        return data if isinstance(data, dict) else {"running": False}
+    except Exception:
+        return {"running": False, "ok": None, "message": "Update status unavailable."}
+
+
+def _git_rev() -> str:
+    code, stdout, _ = _run_command(["git", "rev-parse", "--short", "HEAD"], timeout=8)
+    return stdout.strip() if code == 0 else ""
+
+
+def _run_update_job(restart: bool = False) -> None:
+    if not _UPDATE_LOCK.acquire(blocking=False):
+        return
+    output: list[str] = []
+    started = time.time()
+    try:
+        rev_before = _git_rev()
+        _write_update_status({
+            "running": True,
+            "ok": None,
+            "started_at": started,
+            "rev_before": rev_before,
+            "output": "Starting update...",
+        })
+        steps = [
+            ["git", "fetch", "origin", "main", "--prune"],
+            ["git", "pull", "--ff-only", "origin", "main"],
+        ]
+        ok = True
+        for args in steps:
+            output.append(f"$ {' '.join(args)}")
+            code, stdout, stderr = _run_command(args, timeout=180)
+            if stdout.strip():
+                output.append(stdout.strip())
+            if stderr.strip():
+                output.append(stderr.strip())
+            if code != 0:
+                ok = False
+                break
+            _write_update_status({
+                "running": True,
+                "ok": None,
+                "started_at": started,
+                "rev_before": rev_before,
+                "output": "\n".join(output)[-8000:],
+            })
+        rev_after = _git_rev()
+        if ok and restart and shutil.which("systemctl"):
+            output.append("$ systemctl restart packjack-web.service packjack-ws.service")
+            subprocess.Popen(["systemctl", "restart", "packjack-web.service", "packjack-ws.service"])
+        _write_update_status({
+            "running": False,
+            "ok": ok,
+            "started_at": started,
+            "finished_at": time.time(),
+            "rev_before": rev_before,
+            "rev_after": rev_after,
+            "message": "Updated. Restart the WebUI if files changed." if ok else "Update failed.",
+            "output": "\n".join(output)[-12000:],
+        })
+    finally:
+        _UPDATE_LOCK.release()
 
 
 def _tail_text(path: Path, max_bytes: int = 65536) -> str:
@@ -969,6 +1525,7 @@ class JackPackHandler(SimpleHTTPRequestHandler):
             or parsed.path.startswith("/api/payloads/")
             or parsed.path.startswith("/api/system/")
             or parsed.path.startswith("/api/headless/")
+            or parsed.path.startswith("/api/network/")
             or parsed.path.startswith("/api/settings/")
             or parsed.path.startswith("/api/auth/")
             or parsed.path.startswith("/api/wardriving/")
@@ -1000,6 +1557,9 @@ class JackPackHandler(SimpleHTTPRequestHandler):
             if parsed.path == "/api/payloads/file":
                 self._handle_payloads_file_get(query)
                 return
+            if parsed.path == "/api/payloads/schema":
+                self._handle_payloads_schema(query)
+                return
 
             if parsed.path == "/api/loot/list":
                 self._handle_loot_list(query)
@@ -1026,8 +1586,14 @@ class JackPackHandler(SimpleHTTPRequestHandler):
             if parsed.path == "/api/system/status":
                 self._handle_system_status()
                 return
+            if parsed.path == "/api/system/update-status":
+                self._handle_system_update_status()
+                return
             if parsed.path == "/api/headless/status":
                 self._handle_headless_status()
+                return
+            if parsed.path == "/api/network/status":
+                self._handle_network_status()
                 return
             if parsed.path == "/api/settings/discord_webhook":
                 if not _auth_ok(self, query):
@@ -1046,6 +1612,9 @@ class JackPackHandler(SimpleHTTPRequestHandler):
                     _json_response(self, {"error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
                     return
                 self._handle_settings_tailscale_get()
+                return
+            if parsed.path == "/api/settings/runtime":
+                self._handle_settings_runtime_get()
                 return
 
             _json_response(self, {"error": "not found"}, status=HTTPStatus.NOT_FOUND)
@@ -1075,6 +1644,34 @@ class JackPackHandler(SimpleHTTPRequestHandler):
                 _json_response(self, {"error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
                 return
             self._handle_system_restart_ui()
+            return
+        if parsed.path == "/api/system/update":
+            query = parse_qs(parsed.query or "")
+            if not _auth_ok(self, query):
+                _json_response(self, {"error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
+                return
+            self._handle_system_update()
+            return
+        if parsed.path == "/api/network/scan":
+            query = parse_qs(parsed.query or "")
+            if not _auth_ok(self, query):
+                _json_response(self, {"error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
+                return
+            self._handle_network_scan()
+            return
+        if parsed.path == "/api/network/connect":
+            query = parse_qs(parsed.query or "")
+            if not _auth_ok(self, query):
+                _json_response(self, {"error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
+                return
+            self._handle_network_connect()
+            return
+        if parsed.path == "/api/network/disconnect":
+            query = parse_qs(parsed.query or "")
+            if not _auth_ok(self, query):
+                _json_response(self, {"error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
+                return
+            self._handle_network_disconnect()
             return
 
         if parsed.path == "/api/wardriving/start":
@@ -1144,6 +1741,13 @@ class JackPackHandler(SimpleHTTPRequestHandler):
                 _json_response(self, {"error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
                 return
             self._handle_settings_tailscale_put()
+            return
+        if parsed.path == "/api/settings/runtime":
+            query = parse_qs(parsed.query or "")
+            if not _auth_ok(self, query):
+                _json_response(self, {"error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
+                return
+            self._handle_settings_runtime_put()
             return
         _json_response(self, {"error": "not found"}, status=HTTPStatus.NOT_FOUND)
 
@@ -1261,6 +1865,22 @@ class JackPackHandler(SimpleHTTPRequestHandler):
 
         _json_response(self, {"categories": payload_categories})
 
+    def _handle_payloads_schema(self, query: dict) -> None:
+        raw = query.get("path", [""])[0]
+        target = _safe_payload_path(raw)
+        if target is None or not target.is_file():
+            _json_response(self, {"error": "payload not found"}, status=HTTPStatus.NOT_FOUND)
+            return
+        try:
+            payload_root = PAYLOADS_DIR.resolve()
+            rel_path = str(target.resolve().relative_to(payload_root)).replace("\\", "/")
+        except Exception:
+            rel_path = raw
+        schema = _payload_form_schema(target)
+        schema["path"] = rel_path
+        schema["name"] = Path(rel_path).stem.replace("_", " ").title()
+        _json_response(self, schema)
+
     def _handle_payloads_start(self) -> None:
         body = _read_json(self)
         if body is None:
@@ -1363,6 +1983,43 @@ class JackPackHandler(SimpleHTTPRequestHandler):
 
     def _handle_headless_status(self) -> None:
         _json_response(self, _read_headless_status())
+
+    def _handle_network_status(self) -> None:
+        _json_response(self, _network_status())
+
+    def _handle_network_scan(self) -> None:
+        body = _read_json(self)
+        if body is None:
+            _json_response(self, {"error": "invalid json"}, status=HTTPStatus.BAD_REQUEST)
+            return
+        iface = str(body.get("iface", "")).strip()
+        ok, payload = _wifi_scan(iface)
+        _json_response(self, payload, status=HTTPStatus.OK if ok else HTTPStatus.BAD_REQUEST)
+
+    def _handle_network_connect(self) -> None:
+        body = _read_json(self)
+        if body is None:
+            _json_response(self, {"error": "invalid json"}, status=HTTPStatus.BAD_REQUEST)
+            return
+        ok, payload = _connect_wifi(
+            str(body.get("iface", "")).strip(),
+            str(body.get("ssid", "")).strip(),
+            str(body.get("password", "")),
+            bool(body.get("hidden")),
+            bool(body.get("force_control_iface")),
+        )
+        _json_response(self, payload, status=HTTPStatus.OK if ok else HTTPStatus.CONFLICT)
+
+    def _handle_network_disconnect(self) -> None:
+        body = _read_json(self)
+        if body is None:
+            _json_response(self, {"error": "invalid json"}, status=HTTPStatus.BAD_REQUEST)
+            return
+        ok, payload = _disconnect_iface(
+            str(body.get("iface", "")).strip(),
+            bool(body.get("force_control_iface")),
+        )
+        _json_response(self, payload, status=HTTPStatus.OK if ok else HTTPStatus.CONFLICT)
 
     def _payload_tree_node(self, base: Path, current: Path) -> dict:
         rel = "" if current == base else str(current.relative_to(base)).replace("\\", "/")
@@ -1795,6 +2452,28 @@ class JackPackHandler(SimpleHTTPRequestHandler):
         except Exception as exc:
             _json_response(self, {"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
+    def _handle_system_update_status(self) -> None:
+        _json_response(self, _read_update_status())
+
+    def _handle_system_update(self) -> None:
+        body = _read_json(self)
+        if body is None:
+            _json_response(self, {"error": "invalid json"}, status=HTTPStatus.BAD_REQUEST)
+            return
+        if _UPDATE_LOCK.locked():
+            _json_response(self, {"error": "update already running"}, status=HTTPStatus.CONFLICT)
+            return
+        restart = bool(body.get("restart"))
+        _write_update_status({
+            "running": True,
+            "ok": None,
+            "started_at": time.time(),
+            "message": "Update queued.",
+            "output": "",
+        })
+        threading.Thread(target=_run_update_job, kwargs={"restart": restart}, daemon=True).start()
+        _json_response(self, {"ok": True, "running": True})
+
     def _client_ip(self) -> str:
         try:
             return str(self.client_address[0])
@@ -1990,6 +2669,23 @@ class JackPackHandler(SimpleHTTPRequestHandler):
         else:
             threading.Thread(target=_tailscale_run_install_and_up, daemon=True).start()
         _json_response(self, {"ok": True})
+
+    def _handle_settings_runtime_get(self) -> None:
+        _json_response(self, _runtime_config_payload())
+
+    def _handle_settings_runtime_put(self) -> None:
+        body = _read_json(self)
+        if body is None:
+            _json_response(self, {"error": "invalid json"}, status=HTTPStatus.BAD_REQUEST)
+            return
+        updates = body.get("values") if isinstance(body.get("values"), dict) else body
+        ok, msg = _write_runtime_config(updates)
+        if not ok:
+            _json_response(self, {"error": msg}, status=HTTPStatus.BAD_REQUEST)
+            return
+        payload = _runtime_config_payload()
+        payload.update({"ok": True, "status": msg})
+        _json_response(self, payload)
 
 
 def main() -> None:

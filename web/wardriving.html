@@ -109,6 +109,108 @@
     .detail-val { color:#ccc; text-align:right; max-width:160px; word-break:break-all; }
     .detail-sec { display:inline-block; padding:2px 8px; border-radius:4px; font-size:12px; font-weight:600; margin:6px 0; }
     .detail-gps { margin-top:10px; padding:6px 8px; background:#0a1020; border-radius:4px; font-size:10px; color:#888; }
+
+    @media (max-width: 720px) {
+      body { overflow:hidden; }
+      #topbar {
+        height:auto;
+        min-height:52px;
+        flex-wrap:wrap;
+        padding:8px;
+        gap:6px;
+      }
+      #topbar h1 {
+        width:100%;
+        font-size:13px;
+      }
+      #topbar select {
+        flex:1 1 120px;
+        max-width:none;
+        min-height:32px;
+        font-size:11px;
+      }
+      #topbar button,
+      #topbar a {
+        min-height:32px;
+        padding:4px 8px;
+      }
+      #main { height:calc(100vh - 96px); }
+      #statsOverlay {
+        top:8px;
+        left:8px;
+        right:8px;
+        display:grid;
+        grid-template-columns:repeat(5, minmax(0,1fr));
+        gap:4px;
+        padding:6px;
+        text-align:center;
+      }
+      #statsOverlay .s { display:grid; gap:1px; font-size:9px; }
+      #panel {
+        position:absolute;
+        left:0;
+        right:0;
+        bottom:0;
+        width:auto;
+        height:42vh;
+        z-index:1002;
+        border-left:0;
+        border-top:1px solid var(--border);
+        border-radius:14px 14px 0 0;
+      }
+      #panel.collapsed {
+        width:auto;
+        height:44px;
+        border-top:1px solid var(--border);
+      }
+      #toggleBtn {
+        right:12px;
+        top:auto;
+        bottom:42vh;
+        width:44px;
+        height:32px;
+        border-radius:8px 8px 0 0;
+        border:1px solid #1a2844;
+        transform:none;
+      }
+      #panel.collapsed ~ #toggleBtn { right:12px; bottom:44px; }
+      #panelHead { min-height:40px; align-items:center; padding:8px 12px; }
+      #searchBox { margin:6px 8px; min-height:32px; width:calc(100% - 16px); font-size:12px; }
+      #filterBar { padding:6px 8px; gap:5px; }
+      #filterBar select,
+      #filterBar .fb { min-height:28px; font-size:10px; }
+      #apList { font-size:11px; }
+      .ap { min-height:34px; padding:6px 8px; }
+      #legend {
+        display:none;
+      }
+      #legendToggle {
+        display:block;
+        bottom:calc(42vh + 12px);
+      }
+      #timeline {
+        height:60px;
+        padding:6px 8px;
+      }
+      #timeline .tl-row {
+        gap:6px;
+      }
+      #tlSpeed,
+      #tlCount {
+        display:none;
+      }
+      #apDetail {
+        top:auto;
+        bottom:0;
+        width:100%;
+        max-height:58vh;
+        border-right:0;
+        border-top:1px solid var(--accent);
+        transform:translateY(100%);
+      }
+      #apDetail.open { transform:translateY(0); }
+      .detail-val { max-width:58vw; }
+    }
   </style>
 </head>
 <body>
@@ -321,8 +423,11 @@ function parseCSV(text) {
 
 // --- Clustering: grid-based at low zoom ---
 function clusterNets(nets, zoom) {
-  if (zoom >= 15) return null;
-  const gridSize = zoom <= 10 ? 0.01 : zoom <= 12 ? 0.004 : 0.002;
+  const mobile = window.matchMedia && window.matchMedia('(max-width: 720px)').matches;
+  if (zoom >= (mobile ? 16 : 15)) return null;
+  const gridSize = mobile
+    ? (zoom <= 10 ? 0.018 : zoom <= 12 ? 0.008 : zoom <= 14 ? 0.004 : 0.002)
+    : (zoom <= 10 ? 0.01 : zoom <= 12 ? 0.004 : 0.002);
   const clusters = new Map();
   for (const n of nets) {
     if (!n.hasGps) continue;
@@ -497,7 +602,8 @@ function renderPanel(nets) {
   });
   document.getElementById('pCount').textContent = `(${filtered.length}/${src.length})`;
   const el = document.getElementById('apList');
-  const max = Math.min(filtered.length, 300);
+  const mobile = window.matchMedia && window.matchMedia('(max-width: 720px)').matches;
+  const max = Math.min(filtered.length, mobile ? 90 : 300);
   let html = '';
   for (let i=0; i<max; i++) {
     const n = filtered[i];
@@ -508,6 +614,9 @@ function renderPanel(nets) {
       <div class="badge ${cls}">${label}</div>
       <div class="sig">${n.rssi}</div>
     </div>`;
+  }
+  if (filtered.length > max) {
+    html += `<div class="ap" style="cursor:default;color:#666;justify-content:center">Showing ${max} strongest of ${filtered.length}. Narrow filters to inspect more.</div>`;
   }
   el.innerHTML = html;
   window._panelNets = filtered;

@@ -1,15 +1,12 @@
 (function () {
   const shared = window.RJShared || {};
   const canvas = document.getElementById("screen");
-  const canvasGb = document.getElementById("screen-gb");
-  const canvasPager = document.getElementById("screen-pager");
-  const ctx = canvas.getContext("2d");
-  const ctxGb = canvasGb ? canvasGb.getContext("2d") : null;
-  const ctxPager = canvasPager ? canvasPager.getContext("2d") : null;
+  const ctx = canvas ? canvas.getContext("2d") : null;
   // Enable high-DPI backing store and high-quality smoothing
   let logicalW = parseInt(canvas ? canvas.getAttribute("width") : 128) || 128,
     logicalH = parseInt(canvas ? canvas.getAttribute("height") : 128) || 128;
   function setupHiDPI() {
+    if (!canvas || !ctx) return;
     const DPR = Math.max(1, Math.floor(window.devicePixelRatio || 1));
     canvas.width = logicalW * DPR;
     canvas.height = logicalH * DPR;
@@ -17,39 +14,22 @@
     try {
       ctx.imageSmoothingQuality = "high";
     } catch {}
-    if (canvasGb && ctxGb) {
-      canvasGb.width = logicalW * DPR;
-      canvasGb.height = logicalH * DPR;
-      ctxGb.imageSmoothingEnabled = true;
-      try {
-        ctxGb.imageSmoothingQuality = "high";
-      } catch {}
-    }
-    if (canvasPager && ctxPager) {
-      canvasPager.width = logicalW * DPR;
-      canvasPager.height = logicalH * DPR;
-      ctxPager.imageSmoothingEnabled = true;
-      try {
-        ctxPager.imageSmoothingQuality = "high";
-      } catch {}
-    }
   }
   setupHiDPI();
   window.addEventListener("resize", setupHiDPI);
   const statusEl = document.getElementById("status");
   const statusEls = document.querySelectorAll(".status-text");
-  const deviceShell = document.getElementById("deviceShell");
-  const themeNameEl = document.getElementById("themeName");
   const navDevice = document.getElementById("navDevice");
   const navSystem = document.getElementById("navSystem");
+  const navNetwork = document.getElementById("navNetwork");
   const navLoot = document.getElementById("navLoot");
   const navSettings = document.getElementById("navSettings");
   const navPayloadStudio = document.getElementById("navPayloadStudio");
-  const themeButtons = document.querySelectorAll("[data-theme]");
   const sidebar = document.getElementById("sidebar");
   const sidebarBackdrop = document.getElementById("sidebarBackdrop");
   const menuToggle = document.getElementById("menuToggle");
   const deviceTab = document.getElementById("deviceTab");
+  const networkTab = document.getElementById("networkTab");
   const systemDropdown = document.getElementById("systemDropdown");
   const settingsTab = document.getElementById("settingsTab");
   const lootTab = document.getElementById("lootTab");
@@ -109,7 +89,45 @@
   const attackWifiMeta = document.getElementById("attackWifiMeta");
   const wiredValue = document.getElementById("wiredValue");
   const wiredMeta = document.getElementById("wiredMeta");
+  const networkStatus = document.getElementById("networkStatus");
+  const networkIface = document.getElementById("networkIface");
+  const networkScan = document.getElementById("networkScan");
+  const networkRefresh = document.getElementById("networkRefresh");
+  const networkDisconnect = document.getElementById("networkDisconnect");
+  const networkList = document.getElementById("networkList");
+  const networkSelected = document.getElementById("networkSelected");
+  const networkPassword = document.getElementById("networkPassword");
+  const networkOpen = document.getElementById("networkOpen");
+  const networkHidden = document.getElementById("networkHidden");
+  const networkForceControl = document.getElementById("networkForceControl");
+  const networkConnect = document.getElementById("networkConnect");
+  const networkInterfaces = document.getElementById("networkInterfaces");
+  const payloadLaunchModal = document.getElementById("payloadLaunchModal");
+  const payloadLaunchTitle = document.getElementById("payloadLaunchTitle");
+  const payloadLaunchMeta = document.getElementById("payloadLaunchMeta");
+  const payloadLaunchForm = document.getElementById("payloadLaunchForm");
+  const payloadLaunchRaw = document.getElementById("payloadLaunchRaw");
+  const payloadLaunchCancel = document.getElementById("payloadLaunchCancel");
+  const payloadLaunchClose = document.getElementById("payloadLaunchClose");
+  const payloadLaunchConfirm = document.getElementById("payloadLaunchConfirm");
   const settingsStatus = document.getElementById("settingsStatus");
+  const configStatus = document.getElementById("configStatus");
+  const configReload = document.getElementById("configReload");
+  const configSave = document.getElementById("configSave");
+  const configApIface = document.getElementById("configApIface");
+  const configAttackIface = document.getElementById("configAttackIface");
+  const configWiredIface = document.getElementById("configWiredIface");
+  const configApSsid = document.getElementById("configApSsid");
+  const configApPassword = document.getElementById("configApPassword");
+  const configHostname = document.getElementById("configHostname");
+  const configApAddress = document.getElementById("configApAddress");
+  const configApChannel = document.getElementById("configApChannel");
+  const configWebPort = document.getElementById("configWebPort");
+  const configWsPort = document.getElementById("configWsPort");
+  const updateStatus = document.getElementById("updateStatus");
+  const updateOutput = document.getElementById("updateOutput");
+  const updatePull = document.getElementById("updatePull");
+  const updateRestart = document.getElementById("updateRestart");
   const discordWebhookInput = document.getElementById("discordWebhookInput");
   const discordWebhookSave = document.getElementById("discordWebhookSave");
   const discordWebhookClear = document.getElementById("discordWebhookClear");
@@ -578,6 +596,8 @@
   let lootState = { path: "", parent: "" };
   let nmapVizState = { data: null, jsonUrl: "" };
   let payloadState = { categories: [], open: {}, activePath: null };
+  let networkState = { interfaces: [], selectedNetwork: null };
+  let payloadLaunchState = { path: "", schema: null };
   let term = null;
   let fitAddon = null;
   let shellOpen = false;
@@ -687,6 +707,27 @@
     }
   }
 
+  function setNetworkStatus(txt) {
+    if (networkStatus) {
+      networkStatus.textContent = txt;
+      applyStatusTone(networkStatus, txt);
+    }
+  }
+
+  function setConfigStatus(txt) {
+    if (configStatus) {
+      configStatus.textContent = txt;
+      applyStatusTone(configStatus, txt);
+    }
+  }
+
+  function setUpdateStatus(txt) {
+    if (updateStatus) {
+      updateStatus.textContent = txt;
+      applyStatusTone(updateStatus, txt);
+    }
+  }
+
   function setTailscaleStatus(txt) {
     if (tailscaleSettingsStatus) {
       tailscaleSettingsStatus.textContent = txt;
@@ -727,48 +768,6 @@
     }
   }
 
-  // Handheld themes (frontend-only)
-  const themes = [
-    { id: "neon", label: "Neon" },
-    { id: "gameboy", label: "Game Boy" },
-    { id: "pager", label: "Pager" },
-  ];
-  const THEME_STORAGE_KEY = "rj.defaultTheme";
-  let themeIndex = 0;
-
-  function saveThemePreference(themeId) {
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, themeId);
-    } catch {}
-  }
-
-  function loadThemePreference() {
-    try {
-      const saved = localStorage.getItem(THEME_STORAGE_KEY);
-      if (!saved) return;
-      const idx = themes.findIndex((t) => t.id === saved);
-      if (idx >= 0) themeIndex = idx;
-    } catch {}
-  }
-
-  function applyTheme() {
-    const t = themes[themeIndex];
-    if (!deviceShell) return;
-    deviceShell.classList.remove("theme-neon", "theme-gameboy", "theme-pager");
-    deviceShell.classList.add(`theme-${t.id}`);
-    deviceShell.setAttribute("data-theme", t.id);
-    if (themeNameEl) themeNameEl.textContent = t.label;
-    themeButtons.forEach((btn) => {
-      const isActive = btn.getAttribute("data-theme") === t.id;
-      btn.classList.toggle("bg-emerald-500/20", isActive);
-      btn.classList.toggle("text-emerald-200", isActive);
-      btn.classList.toggle("border-emerald-400/40", isActive);
-      btn.classList.toggle("bg-slate-900/40", !isActive);
-      btn.classList.toggle("text-slate-300", !isActive);
-      btn.classList.toggle("border-slate-500/20", !isActive);
-    });
-  }
-
   function setSidebarOpen(open) {
     if (!sidebar) return;
     sidebar.classList.toggle("-translate-x-full", !open);
@@ -794,11 +793,17 @@
     activeTab = tab;
     const isDevice = tab === "device";
     if (deviceTab) deviceTab.classList.toggle("hidden", !isDevice);
+    if (networkTab) networkTab.classList.toggle("hidden", tab !== "network");
     if (settingsTab) settingsTab.classList.toggle("hidden", tab !== "settings");
     if (lootTab) lootTab.classList.toggle("hidden", tab !== "loot");
     setNavActive(navDevice, isDevice);
+    setNavActive(navNetwork, tab === "network");
     setNavActive(navLoot, tab === "loot");
     setNavActive(navSettings, tab === "settings");
+    document.querySelectorAll("[data-mobile-tab]").forEach((btn) => {
+      const active = btn.getAttribute("data-mobile-tab") === tab;
+      btn.classList.toggle("jp-mobile-active", active);
+    });
     setSidebarOpen(false);
   }
 
@@ -810,15 +815,6 @@
     setNavActive(navSystem, systemOpen);
     if (systemOpen) {
       loadSystemStatus();
-    }
-  }
-
-  function setThemeById(id) {
-    const idx = themes.findIndex((t) => t.id === id);
-    if (idx >= 0) {
-      themeIndex = idx;
-      applyTheme();
-      saveThemePreference(id);
     }
   }
 
@@ -859,6 +855,7 @@
       try {
         const msg = JSON.parse(ev.data);
         if (msg.type === "frame" && msg.data) {
+          if (!canvas || !ctx) return;
           const img = new Image();
           img.onload = () => {
             try {
@@ -869,31 +866,14 @@
                 logicalW = img.naturalWidth;
                 logicalH = img.naturalHeight;
                 setupHiDPI();
-                [canvas, canvasGb, canvasPager].forEach((c) => {
+                [canvas].forEach((c) => {
                   if (!c) return;
                   c.style.aspectRatio = logicalW + "/" + logicalH;
                   c.classList.remove("aspect-square");
                 });
-                // Re-apply slider with correct logicalW
-                const _sl = document.getElementById("screenSizeSlider");
-                if (_sl) _applyScreenSize(_sl.value);
               }
               ctx.clearRect(0, 0, canvas.width, canvas.height);
               ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-              if (ctxGb && canvasGb) {
-                ctxGb.clearRect(0, 0, canvasGb.width, canvasGb.height);
-                ctxGb.drawImage(img, 0, 0, canvasGb.width, canvasGb.height);
-              }
-              if (ctxPager && canvasPager) {
-                ctxPager.clearRect(0, 0, canvasPager.width, canvasPager.height);
-                ctxPager.drawImage(
-                  img,
-                  0,
-                  0,
-                  canvasPager.width,
-                  canvasPager.height,
-                );
-              }
             } catch {}
           };
           img.src = "data:image/jpeg;base64," + msg.data;
@@ -1221,6 +1201,203 @@
     }
   }
 
+  function ifaceLabel(item) {
+    const role = String(item?.role || "network").replace("_", " ");
+    const bits = [item?.name || "iface", role];
+    if (item?.recommended) bits.push("recommended");
+    if (item?.protected) bits.push("control AP");
+    return bits.join(" · ");
+  }
+
+  function renderNetworkInterfaces() {
+    if (networkInterfaces) {
+      const items = networkState.interfaces || [];
+      networkInterfaces.innerHTML = items.length
+        ? items
+            .map((item) => {
+              const tone = item.protected
+                ? "text-amber-300"
+                : item.recommended
+                  ? "text-emerald-300"
+                  : "text-slate-300";
+              const ip = item.ipv4 || "-";
+              const state = item.state || "unknown";
+              const connection = item.connection ? ` · ${escapeHtml(item.connection)}` : "";
+              return `<div class="jp-iface-row">
+                <div>
+                  <div class="font-semibold ${tone}">${escapeHtml(item.name || "-")}</div>
+                  <div class="text-[11px] text-slate-500">${escapeHtml(String(item.role || "network").replace("_", " "))}${connection}</div>
+                </div>
+                <div class="text-right">
+                  <div class="text-xs text-slate-200">${escapeHtml(state)}</div>
+                  <div class="text-[11px] text-slate-500">${escapeHtml(ip)}</div>
+                </div>
+              </div>`;
+            })
+            .join("")
+        : '<div class="text-xs text-slate-500">No interfaces detected yet.</div>';
+    }
+    if (!networkIface) return;
+    const previous = networkIface.value;
+    const wifiItems = (networkState.interfaces || []).filter((item) => item.wireless || item.role === "control_ap" || item.role === "attack_wifi");
+    networkIface.innerHTML = wifiItems
+      .map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(ifaceLabel(item))}</option>`)
+      .join("");
+    const preferred =
+      wifiItems.find((item) => item.recommended && item.present) ||
+      wifiItems.find((item) => item.role === "attack_wifi") ||
+      wifiItems[0];
+    if (previous && wifiItems.some((item) => item.name === previous)) {
+      networkIface.value = previous;
+    } else if (preferred) {
+      networkIface.value = preferred.name;
+    }
+  }
+
+  function renderNetworkList(items) {
+    if (!networkList) return;
+    if (!items || !items.length) {
+      networkList.innerHTML = '<div class="text-xs text-slate-500 p-3">No networks loaded. Pick an interface and scan.</div>';
+      return;
+    }
+    networkList.innerHTML = items
+      .map((net, idx) => {
+        const ssid = net.ssid || "(hidden)";
+        const security = net.open ? "Open" : net.security || "Secured";
+        const signal = net.signal === null || net.signal === undefined ? "-" : `${net.signal}%`;
+        const selected = networkState.selectedNetwork && networkState.selectedNetwork.bssid === net.bssid;
+        return `<button type="button" data-network-index="${idx}" class="jp-network-row ${selected ? "jp-network-selected" : ""}">
+          <div class="min-w-0">
+            <div class="jp-network-ssid">${escapeHtml(ssid)}</div>
+            <div class="jp-network-meta">${escapeHtml(security)} · ch ${escapeHtml(net.channel || "-")} · ${escapeHtml(net.bssid || "")}</div>
+          </div>
+          <div class="jp-network-signal">${escapeHtml(signal)}</div>
+        </button>`;
+      })
+      .join("");
+    networkList.dataset.networks = JSON.stringify(items);
+  }
+
+  function selectNetwork(net) {
+    networkState.selectedNetwork = net || null;
+    if (networkSelected) {
+      networkSelected.textContent = net ? (net.ssid || "(hidden)") : "Select a network";
+    }
+    if (networkOpen) {
+      networkOpen.checked = !!(net && net.open);
+    }
+    if (networkPassword) {
+      networkPassword.disabled = !!(net && net.open);
+      networkPassword.placeholder = net && net.open ? "Open network" : "Network password";
+      if (net && net.open) networkPassword.value = "";
+    }
+    try {
+      const items = JSON.parse(networkList?.dataset.networks || "[]");
+      renderNetworkList(items);
+    } catch {}
+  }
+
+  async function loadNetworkStatus() {
+    setNetworkStatus("Loading...");
+    try {
+      const res = await apiFetch(getApiUrl("/api/network/status"), { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "network_failed");
+      networkState.interfaces = Array.isArray(data.interfaces) ? data.interfaces : [];
+      renderNetworkInterfaces();
+      setNetworkStatus(data.nmcli ? "Ready" : "nmcli missing");
+    } catch (e) {
+      setNetworkStatus("Unavailable");
+    }
+  }
+
+  async function scanNetworks() {
+    const iface = networkIface ? networkIface.value : "";
+    if (!iface) {
+      setNetworkStatus("Pick an interface");
+      return;
+    }
+    selectNetwork(null);
+    setNetworkStatus(`Scanning ${iface}...`);
+    try {
+      const res = await apiFetch(getApiUrl("/api/network/scan"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ iface }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "scan_failed");
+      renderNetworkList(data.networks || []);
+      setNetworkStatus(`${(data.networks || []).length} networks`);
+    } catch (e) {
+      renderNetworkList([]);
+      setNetworkStatus(e && e.message ? e.message : "Scan failed");
+    }
+  }
+
+  async function connectSelectedNetwork() {
+    const iface = networkIface ? networkIface.value : "";
+    const net = networkState.selectedNetwork;
+    const ssid = net ? net.ssid : "";
+    if (!iface || !ssid) {
+      setNetworkStatus("Select a network");
+      return;
+    }
+    const isOpen = !!(networkOpen && networkOpen.checked);
+    setNetworkStatus(`Connecting ${iface}...`);
+    try {
+      const res = await apiFetch(getApiUrl("/api/network/connect"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          iface,
+          ssid,
+          password: isOpen || !networkPassword ? "" : networkPassword.value,
+          hidden: !!(networkHidden && networkHidden.checked),
+          force_control_iface: !!(networkForceControl && networkForceControl.checked),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "connect_failed");
+      if (data.status && Array.isArray(data.status.interfaces)) {
+        networkState.interfaces = data.status.interfaces;
+        renderNetworkInterfaces();
+      } else {
+        await loadNetworkStatus();
+      }
+      setNetworkStatus("Connected");
+    } catch (e) {
+      setNetworkStatus(e && e.message ? e.message : "Connect failed");
+    }
+  }
+
+  async function disconnectNetwork() {
+    const iface = networkIface ? networkIface.value : "";
+    if (!iface) return;
+    setNetworkStatus(`Disconnecting ${iface}...`);
+    try {
+      const res = await apiFetch(getApiUrl("/api/network/disconnect"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          iface,
+          force_control_iface: !!(networkForceControl && networkForceControl.checked),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "disconnect_failed");
+      if (data.status && Array.isArray(data.status.interfaces)) {
+        networkState.interfaces = data.status.interfaces;
+        renderNetworkInterfaces();
+      } else {
+        await loadNetworkStatus();
+      }
+      setNetworkStatus("Disconnected");
+    } catch (e) {
+      setNetworkStatus(e && e.message ? e.message : "Disconnect failed");
+    }
+  }
+
   async function loadDiscordWebhook() {
     setSettingsStatus("Loading...");
     try {
@@ -1302,6 +1479,143 @@
       applyTailscaleDataToUI(data);
     } catch (e) {
       setTailscaleStatus("Failed to load Tailscale");
+    }
+  }
+
+  function applyRuntimeConfig(data) {
+    const values = (data && data.values) || {};
+    const configured = (data && data.configured) || {};
+    if (configApIface) configApIface.value = values.JACKPACK_AP_IFACE || "";
+    if (configAttackIface) configAttackIface.value = values.JACKPACK_ATTACK_IFACE || "";
+    if (configWiredIface) configWiredIface.value = values.JACKPACK_WIRED_IFACE || "";
+    if (configApSsid) configApSsid.value = values.JACKPACK_AP_SSID || "";
+    if (configApPassword) {
+      configApPassword.value = "";
+      configApPassword.placeholder = configured.JACKPACK_AP_PASSWORD
+        ? `Saved: ${values.JACKPACK_AP_PASSWORD || "configured"}`
+        : "New AP password";
+    }
+    if (configHostname) configHostname.value = values.JACKPACK_HOSTNAME || "";
+    if (configApAddress) configApAddress.value = values.JACKPACK_AP_ADDRESS || "";
+    if (configApChannel) configApChannel.value = values.JACKPACK_AP_CHANNEL || "";
+    if (configWebPort) configWebPort.value = values.RJ_WEB_PORT || "";
+    if (configWsPort) configWsPort.value = values.RJ_WS_PORT || "";
+  }
+
+  async function loadRuntimeConfig() {
+    if (!configStatus) return;
+    setConfigStatus("Loading...");
+    try {
+      const res = await apiFetch(getApiUrl("/api/settings/runtime"), { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "config_failed");
+      applyRuntimeConfig(data);
+      setConfigStatus("Loaded");
+    } catch (e) {
+      setConfigStatus("Unavailable");
+    }
+  }
+
+  async function saveRuntimeConfig() {
+    const values = {
+      JACKPACK_AP_IFACE: configApIface ? configApIface.value : "",
+      JACKPACK_ATTACK_IFACE: configAttackIface ? configAttackIface.value : "",
+      JACKPACK_WIRED_IFACE: configWiredIface ? configWiredIface.value : "",
+      JACKPACK_AP_SSID: configApSsid ? configApSsid.value : "",
+      JACKPACK_HOSTNAME: configHostname ? configHostname.value : "",
+      JACKPACK_AP_ADDRESS: configApAddress ? configApAddress.value : "",
+      JACKPACK_AP_CHANNEL: configApChannel ? configApChannel.value : "",
+      RJ_WEB_PORT: configWebPort ? configWebPort.value : "",
+      RJ_WS_PORT: configWsPort ? configWsPort.value : "",
+    };
+    if (configApPassword && configApPassword.value.trim()) {
+      values.JACKPACK_AP_PASSWORD = configApPassword.value.trim();
+    }
+    setConfigStatus("Saving...");
+    try {
+      const res = await apiFetch(getApiUrl("/api/settings/runtime"), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ values }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "save_failed");
+      applyRuntimeConfig(data);
+      setConfigStatus("Saved. Restart services to apply.");
+    } catch (e) {
+      setConfigStatus(e && e.message ? e.message : "Save failed");
+    }
+  }
+
+  function renderUpdateStatus(data) {
+    const running = !!(data && data.running);
+    if (updateOutput) {
+      updateOutput.textContent = (data && (data.output || data.message)) || "No update run yet.";
+    }
+    if (running) {
+      setUpdateStatus("Updating...");
+    } else if (data && data.ok === true) {
+      const before = data.rev_before || "?";
+      const after = data.rev_after || "?";
+      setUpdateStatus(before === after ? "Already current" : `Updated ${before} -> ${after}`);
+    } else if (data && data.ok === false) {
+      setUpdateStatus("Update failed");
+    } else {
+      setUpdateStatus("Ready");
+    }
+  }
+
+  async function loadUpdateStatus() {
+    if (!updateStatus) return false;
+    try {
+      const res = await apiFetch(getApiUrl("/api/system/update-status"), { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) throw new Error("update_status_failed");
+      renderUpdateStatus(data);
+      return !!data.running;
+    } catch (e) {
+      setUpdateStatus("Unavailable");
+      return false;
+    }
+  }
+
+  async function startUpdate() {
+    setUpdateStatus("Starting...");
+    try {
+      const res = await apiFetch(getApiUrl("/api/system/update"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ restart: false }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "update_failed");
+      pollUpdateUntilDone();
+    } catch (e) {
+      setUpdateStatus(e && e.message ? e.message : "Update failed");
+    }
+  }
+
+  function pollUpdateUntilDone() {
+    let tries = 0;
+    const tick = async () => {
+      tries += 1;
+      const running = await loadUpdateStatus();
+      if (running && tries < 240) {
+        setTimeout(tick, 1500);
+      }
+    };
+    tick();
+  }
+
+  async function restartWebUi() {
+    setUpdateStatus("Restarting...");
+    try {
+      const res = await apiFetch(getApiUrl("/api/system/restart-ui"), { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "restart_failed");
+      setUpdateStatus("Restart requested");
+    } catch (e) {
+      setUpdateStatus(e && e.message ? e.message : "Restart failed");
     }
   }
 
@@ -2100,14 +2414,143 @@
       .join("");
   }
 
-  async function startPayload(path) {
+  function splitArgs(text) {
+    const args = [];
+    let cur = "";
+    let quote = "";
+    let escaped = false;
+    for (const char of String(text || "")) {
+      if (escaped) {
+        cur += char;
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (quote) {
+        if (char === quote) quote = "";
+        else cur += char;
+      } else if (char === '"' || char === "'") {
+        quote = char;
+      } else if (/\s/.test(char)) {
+        if (cur) {
+          args.push(cur);
+          cur = "";
+        }
+      } else {
+        cur += char;
+      }
+    }
+    if (cur) args.push(cur);
+    return args;
+  }
+
+  function closePayloadLaunch() {
+    if (payloadLaunchModal) payloadLaunchModal.classList.add("hidden");
+    payloadLaunchState = { path: "", schema: null };
+  }
+
+  function renderPayloadLaunchForm(schema) {
+    if (!payloadLaunchForm) return;
+    const fields = Array.isArray(schema?.fields) ? schema.fields : [];
+    if (payloadLaunchTitle) payloadLaunchTitle.textContent = schema?.name || payloadLabel(schema?.path);
+    if (payloadLaunchMeta) {
+      const tags = Array.isArray(schema?.meta?.tags) ? schema.meta.tags.join(" · ") : "headless payload";
+      payloadLaunchMeta.textContent = `${schema?.path || ""}${tags ? ` · ${tags}` : ""}`;
+    }
+    if (!fields.length) {
+      payloadLaunchForm.innerHTML =
+        '<div class="jp-empty-form">No structured options declared yet. Use raw args below when a payload needs flags.</div>';
+    } else {
+      payloadLaunchForm.innerHTML = fields
+        .map((field, idx) => {
+          const name = escapeHtml(field.name || `field_${idx}`);
+          const label = escapeHtml(field.label || field.name || "Option");
+          const help = field.help ? `<div class="jp-field-help">${escapeHtml(field.help)}</div>` : "";
+          const required = field.required ? "required" : "";
+          const def = field.default === undefined || field.default === null ? "" : String(field.default);
+          if (field.type === "checkbox") {
+            const checked = field.default === true ? "checked" : "";
+            return `<label class="jp-check-row">
+              <input type="checkbox" data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${checked}>
+              <span><strong>${label}</strong>${help}</span>
+            </label>`;
+          }
+          if (field.type === "select" && Array.isArray(field.choices)) {
+            return `<label class="jp-field">
+              <span>${label}</span>
+              <select data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${required}>
+                <option value="">Default</option>
+                ${field.choices.map((choice) => `<option value="${escapeHtml(choice)}" ${choice === def ? "selected" : ""}>${escapeHtml(choice)}</option>`).join("")}
+              </select>
+              ${help}
+            </label>`;
+          }
+          return `<label class="jp-field">
+            <span>${label}</span>
+            <input type="${field.type === "number" ? "number" : "text"}" data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" value="${escapeHtml(def)}" ${required}>
+            ${help}
+          </label>`;
+        })
+        .join("");
+    }
+    if (payloadLaunchRaw) payloadLaunchRaw.value = "";
+  }
+
+  async function openPayloadLaunch(path) {
+    payloadLaunchState = { path, schema: null };
+    if (payloadLaunchModal) payloadLaunchModal.classList.remove("hidden");
+    if (payloadLaunchForm) {
+      payloadLaunchForm.innerHTML = '<div class="jp-empty-form">Loading options...</div>';
+    }
+    try {
+      const res = await apiFetch(getApiUrl("/api/payloads/schema", { path }), { cache: "no-store" });
+      const schema = await res.json();
+      if (!res.ok) throw new Error(schema && schema.error ? schema.error : "schema_failed");
+      payloadLaunchState.schema = schema;
+      renderPayloadLaunchForm(schema);
+    } catch (e) {
+      payloadLaunchState.schema = { path, name: payloadLabel(path), fields: [], raw_args: true, meta: {} };
+      renderPayloadLaunchForm(payloadLaunchState.schema);
+      if (payloadLaunchMeta) payloadLaunchMeta.textContent = e && e.message ? e.message : "Options unavailable";
+    }
+  }
+
+  function buildPayloadArgsFromForm() {
+    const args = [];
+    if (payloadLaunchForm) {
+      payloadLaunchForm.querySelectorAll("[data-payload-field]").forEach((el) => {
+        const arg = el.getAttribute("data-arg") || "";
+        if (!arg) return;
+        if (el.type === "checkbox") {
+          if (el.checked) args.push(arg);
+          return;
+        }
+        const value = String(el.value || "").trim();
+        if (!value) return;
+        args.push(arg, value);
+      });
+    }
+    if (payloadLaunchRaw && payloadLaunchRaw.value.trim()) {
+      args.push(...splitArgs(payloadLaunchRaw.value));
+    }
+    return args;
+  }
+
+  async function confirmPayloadLaunch() {
+    const path = payloadLaunchState.path;
+    if (!path) return;
+    const args = buildPayloadArgsFromForm();
+    closePayloadLaunch();
+    await startPayload(path, args);
+  }
+
+  async function startPayload(path, args = []) {
     setPayloadStatus("Starting...");
     try {
       const url = getApiUrl("/api/payloads/start");
       const res = await apiFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path }),
+        body: JSON.stringify({ path, args }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
@@ -2305,6 +2748,11 @@
     navSystem.addEventListener("click", () => {
       setSystemOpen(!systemOpen);
     });
+  if (navNetwork)
+    navNetwork.addEventListener("click", () => {
+      setActiveTab("network");
+      loadNetworkStatus();
+    });
   if (navLoot)
     navLoot.addEventListener("click", () => {
       setActiveTab("loot");
@@ -2316,18 +2764,33 @@
   if (navSettings)
     navSettings.addEventListener("click", () => {
       setActiveTab("settings");
+      loadRuntimeConfig();
+      loadUpdateStatus();
       loadDiscordWebhook();
       loadWigleSettings();
       loadTailscaleSettings();
     });
-  if (navPayloadStudio)
-    navPayloadStudio.href = "./ide.html" + getForwardSearch();
-  themeButtons.forEach((btn) => {
+  document.querySelectorAll("[data-mobile-tab]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const id = btn.getAttribute("data-theme");
-      if (id) setThemeById(id);
+      const tab = btn.getAttribute("data-mobile-tab");
+      if (!tab) return;
+      setActiveTab(tab);
+      if (tab === "network") loadNetworkStatus();
+      if (tab === "settings") {
+        loadRuntimeConfig();
+        loadUpdateStatus();
+        loadDiscordWebhook();
+        loadWigleSettings();
+        loadTailscaleSettings();
+      }
+      if (tab === "loot" && lootList && !lootList.dataset.loaded) {
+        loadLoot("");
+        lootList.dataset.loaded = "1";
+      }
     });
   });
+  if (navPayloadStudio)
+    navPayloadStudio.href = "./ide.html" + getForwardSearch();
   if (menuToggle)
     menuToggle.addEventListener("click", () => setSidebarOpen(true));
   if (sidebarBackdrop)
@@ -2377,7 +2840,7 @@
       if (startBtn) {
         const encodedPath = startBtn.getAttribute("data-start") || "";
         const path = decodeURIComponent(encodedPath);
-        if (path) startPayload(path);
+        if (path) openPayloadLaunch(path);
         return;
       }
       const stopBtn = e.target.closest("[data-stop]");
@@ -2395,7 +2858,7 @@
       if (startBtn) {
         const encodedPath = startBtn.getAttribute("data-start") || "";
         const path = decodeURIComponent(encodedPath);
-        if (path) startPayload(path);
+        if (path) openPayloadLaunch(path);
         return;
       }
       const stopBtn = e.target.closest("[data-stop]");
@@ -2405,6 +2868,46 @@
     payloadLogRefresh.addEventListener("click", () => loadPayloadLog());
   if (activePayloadStop)
     activePayloadStop.addEventListener("click", () => stopPayload());
+  if (networkRefresh)
+    networkRefresh.addEventListener("click", () => loadNetworkStatus());
+  if (networkScan)
+    networkScan.addEventListener("click", () => scanNetworks());
+  if (networkDisconnect)
+    networkDisconnect.addEventListener("click", () => disconnectNetwork());
+  if (networkConnect)
+    networkConnect.addEventListener("click", () => connectSelectedNetwork());
+  if (networkList)
+    networkList.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-network-index]");
+      if (!btn) return;
+      try {
+        const items = JSON.parse(networkList.dataset.networks || "[]");
+        const idx = Number(btn.getAttribute("data-network-index"));
+        selectNetwork(items[idx]);
+      } catch {}
+    });
+  if (networkOpen)
+    networkOpen.addEventListener("change", () => {
+      if (networkPassword) networkPassword.disabled = networkOpen.checked;
+    });
+  if (payloadLaunchCancel)
+    payloadLaunchCancel.addEventListener("click", closePayloadLaunch);
+  if (payloadLaunchClose)
+    payloadLaunchClose.addEventListener("click", closePayloadLaunch);
+  if (payloadLaunchConfirm)
+    payloadLaunchConfirm.addEventListener("click", confirmPayloadLaunch);
+  if (payloadLaunchModal)
+    payloadLaunchModal.addEventListener("click", (e) => {
+      if (e.target === payloadLaunchModal) closePayloadLaunch();
+    });
+  if (configReload)
+    configReload.addEventListener("click", loadRuntimeConfig);
+  if (configSave)
+    configSave.addEventListener("click", saveRuntimeConfig);
+  if (updatePull)
+    updatePull.addEventListener("click", startUpdate);
+  if (updateRestart)
+    updateRestart.addEventListener("click", restartWebUi);
   if (discordWebhookSave)
     discordWebhookSave.addEventListener("click", () => {
       saveDiscordWebhook(discordWebhookInput ? discordWebhookInput.value : "");
@@ -2507,8 +3010,6 @@
   if (authModalPasswordConfirm)
     authModalPasswordConfirm.addEventListener("keydown", authSubmitFromEnter);
   loadAuthToken();
-  loadThemePreference();
-  applyTheme();
   setActiveTab("device");
 
   let payloadPollTimer = null;
@@ -2555,42 +3056,11 @@
       connect();
       loadPayloads();
       loadHeadlessStatus();
+      loadNetworkStatus();
       loadPayloadLog();
       schedulePayloadPoll();
       scheduleSystemPoll();
     });
   };
   startAfterAuth();
-  // Screen size slider
-  const _sizeSlider = document.getElementById("screenSizeSlider");
-  const _sizeLabel = document.getElementById("screenSizeLabel");
-  if (_sizeSlider) {
-    const _savedPct = localStorage.getItem("rj_screen_pct");
-    if (_savedPct && parseInt(_savedPct) >= 50) _sizeSlider.value = _savedPct;
-    else _sizeSlider.value = 100;
-    function _applyScreenSize(pct) {
-      const scale = pct / 100;
-      const w = Math.round(logicalW * scale);
-      [canvas, canvasGb, canvasPager].forEach((c) => {
-        if (!c) return;
-        c.style.width = w + "px";
-        c.style.height = "auto";
-      });
-      if (_sizeLabel) _sizeLabel.textContent = "x" + scale.toFixed(1);
-      // Layout: device on top, terminal below
-      const wrapper = document.querySelector("#compatDeviceLayout");
-      const deviceDiv = document.querySelector(
-        "#compatDeviceLayout > div:last-child",
-      );
-      if (wrapper && deviceDiv) {
-        wrapper.className = "flex flex-col items-center gap-6";
-        deviceDiv.className = "flex justify-center w-full order-first";
-      }
-    }
-    _applyScreenSize(_sizeSlider.value);
-    _sizeSlider.addEventListener("input", function () {
-      _applyScreenSize(this.value);
-      localStorage.setItem("rj_screen_pct", this.value);
-    });
-  }
 })();

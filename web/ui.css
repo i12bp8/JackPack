@@ -202,6 +202,184 @@ a.ide-toolbar-btn {
   white-space: pre-wrap;
 }
 
+.jp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.25rem;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(30, 41, 59, 0.62);
+  color: #e2e8f0;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.jp-btn:hover {
+  background: rgba(51, 65, 85, 0.78);
+  border-color: rgba(148, 163, 184, 0.34);
+  color: #fff;
+}
+
+.jp-btn-primary {
+  border-color: rgba(16, 185, 129, 0.42);
+  background: rgba(16, 185, 129, 0.18);
+  color: #d1fae5;
+}
+
+.jp-btn-muted {
+  background: rgba(15, 23, 42, 0.64);
+}
+
+.jp-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem;
+}
+
+.jp-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.jp-field input,
+.jp-field select {
+  width: 100%;
+  min-height: 2.35rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.78);
+  color: #f8fafc;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.jp-field-help {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.jp-check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  min-height: 2.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.17);
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.32);
+  padding: 0.65rem;
+  color: #cbd5e1;
+  font-size: 0.76rem;
+}
+
+.jp-check-row input {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.1rem;
+  accent-color: #10b981;
+}
+
+.jp-check-row strong {
+  display: block;
+  color: #e2e8f0;
+  font-size: 0.78rem;
+}
+
+.jp-check-row small {
+  display: block;
+  color: #64748b;
+  font-size: 0.68rem;
+}
+
+.jp-danger-row {
+  border-color: rgba(245, 158, 11, 0.28);
+  background: rgba(120, 53, 15, 0.12);
+}
+
+.jp-iface-row,
+.jp-network-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(2, 6, 23, 0.34);
+  border-radius: 10px;
+  padding: 0.72rem;
+}
+
+.jp-network-list {
+  display: grid;
+  gap: 0.45rem;
+  max-height: 22rem;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.jp-network-row {
+  text-align: left;
+}
+
+.jp-network-row:hover,
+.jp-network-selected {
+  border-color: rgba(16, 185, 129, 0.38);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.jp-network-ssid {
+  color: #f8fafc;
+  font-size: 0.86rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.jp-network-meta {
+  margin-top: 0.2rem;
+  color: #64748b;
+  font-size: 0.7rem;
+  overflow-wrap: anywhere;
+}
+
+.jp-network-signal {
+  color: #6ee7b7;
+  font-size: 0.82rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.jp-console-panel {
+  margin-top: 1rem;
+}
+
+.jp-empty-form {
+  grid-column: 1 / -1;
+  border: 1px dashed rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.24);
+  color: #94a3b8;
+  padding: 0.9rem;
+  font-size: 0.8rem;
+}
+
+.jp-mobile-tabbar {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .jp-hero {
     grid-template-columns: 1fr;
@@ -350,19 +528,99 @@ header .text-\[10px\],
   main {
     padding-left: 0.75rem !important;
     padding-right: 0.75rem !important;
+    padding-bottom: 5.5rem !important;
   }
   #menuToggle,
   #logoutBtn {
     min-height: 2.25rem;
   }
-}
-/* device shell: center below the side-by-side breakpoint (lg = 1024px) */
-@media (max-width: 1023px) {
-  #deviceShell {
-    align-self: center;
+  .jp-mobile-tabbar {
+    position: fixed;
+    z-index: 35;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.35rem;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 16px;
+    background: rgba(2, 6, 23, 0.9);
+    padding: 0.35rem;
+    box-shadow: 0 18px 42px rgba(2, 6, 23, 0.58);
+    backdrop-filter: blur(14px);
+  }
+  .jp-mobile-tabbar button {
+    display: grid;
+    justify-items: center;
+    gap: 0.2rem;
+    min-height: 3rem;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    color: #94a3b8;
+    font-size: 0.66rem;
+    font-weight: 800;
+    background: transparent;
+  }
+  .jp-mobile-tabbar i {
+    font-size: 1rem;
+  }
+  .jp-mobile-tabbar .jp-mobile-active {
+    border-color: rgba(16, 185, 129, 0.36);
+    background: rgba(16, 185, 129, 0.13);
+    color: #d1fae5;
+  }
+  .jp-hero {
+    padding: 0.85rem;
+    border-radius: 14px;
+  }
+  .jp-hero h1 {
+    font-size: 2.35rem;
+  }
+  .jp-hero-meta {
+    gap: 0.35rem;
+  }
+  .jp-card,
+  .jp-panel {
+    padding: 0.75rem;
+    border-radius: 12px;
+  }
+  .jp-panel-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .jp-payload-grid {
+    grid-template-columns: 1fr;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+  .jp-payload-card {
+    min-height: 0;
+  }
+  .jp-log {
+    min-height: 12rem;
+    max-height: 18rem;
+    font-size: 0.68rem;
+  }
+  .terminal-wrap {
+    border-radius: 12px;
+  }
+  #deviceTab .terminal-body {
+    height: 46vh !important;
+    min-height: 18rem;
+  }
+  .jp-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .jp-network-list {
+    max-height: 42vh;
+  }
+  .jp-iface-row,
+  .jp-network-row {
+    padding: 0.65rem;
   }
 }
-
 /* ---------- Look-match PR1: make WebUI visually closer to IDE ---------- */
 body {
   font-family: 'Space Grotesk', system-ui, sans-serif;
@@ -437,8 +695,7 @@ main {
 /* WebUI cards align with IDE card depth */
 #deviceTab .terminal-wrap,
 #settingsTab > div,
-#lootTab > div,
-#deviceShell {
+#lootTab > div {
   box-shadow: 0 16px 34px rgba(2,6,23,0.42) !important;
 }
 
@@ -517,9 +774,4 @@ main > .flex.items-center.justify-between.mb-4.md\:mb-6 {
   #lootList {
     max-height: min(52vh, 26rem);
   }
-}
-
-#deviceShell.theme-neon,
-#deviceShell[data-theme="neon"] {
-  filter: saturate(0.92) brightness(0.98);
 }

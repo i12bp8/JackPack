@@ -40,13 +40,17 @@ The goal is simple: no tiny screen, no button choreography, no web page pretendi
 ## Features
 
 - **Phone-first WebUI:** modern headless dashboard for launch/status/logging.
+- **Connect panel:** scan from internal or external WiFi, join open or passworded networks, and protect the control AP from accidental disconnects.
 - **Friendly local URL:** installer sets up `jackpack.local` with Avahi/mDNS.
-- **Direct payload runtime:** start, stop, and inspect payloads without simulating LCD buttons.
+- **Direct payload runtime:** start, configure, stop, and inspect payloads without simulating LCD buttons.
+- **Payload form engine:** payloads can expose structured launch fields through `JACKPACK_FORM`; JackPack also auto-detects common `argparse` options.
 - **Pi 5 interface policy:** `wlan0` stays control-only, `wlan1` stays payload WiFi, `eth0` stays wired target.
 - **Payload compatibility:** legacy display/input imports are quarantined under `packjack/compat/`.
 - **Loot browser:** browse runtime output and captures from the WebUI.
 - **Nmap visualization:** inspect scan output from the browser.
-- **Browser terminal:** WebSocket shell bridge for field control.
+- **Mobile wardriving map:** clustered map and phone-friendly network list.
+- **Browser terminal:** on-demand WebSocket shell bridge for field control.
+- **WebUI updater:** pull the latest `origin/main` from the browser, then restart the WebUI.
 - **Clean installer:** interactive or scripted setup for AP name, AP password, hostname, ports, and interface roles.
 
 ## Getting Started
@@ -104,6 +108,13 @@ The installer configures the Pi 5 for the intended JackPack layout:
 - `packjack-ws.service`: serves terminal/input/frame WebSocket features.
 - `packjack-pin-wifi.service`: keeps Pi 5 WiFi interface names stable at boot.
 
+## WebUI Controls
+
+- **Dashboard:** payload launchpad, active payload state, logs, and on-demand terminal.
+- **Connect:** pick `wlan0` or `wlan1`, scan nearby WiFi, connect to open or secured networks, and disconnect safely. JackPack blocks control-AP changes unless you explicitly allow them.
+- **Config:** edit AP SSID, AP password, hostname, interface roles, and service ports from the browser.
+- **Updater:** fast-forward pull from GitHub and restart the WebUI after updating.
+
 ## Project Layout
 
 ```text
@@ -128,6 +139,7 @@ loot/                     Runtime output; ignored except bundled wordlists
 - Do not use `wlan0` for attacks; it is the phone-control AP.
 - Write output under `loot/<feature>/` so the WebUI can browse it.
 - Prefer non-interactive CLI/API behavior. If a legacy payload still expects LCD/buttons, keep it compatible through `packjack.compat` and mark it as compat.
+- Add a `JACKPACK_FORM = {...}` dictionary or normal `argparse` options when a payload needs user input; the WebUI turns those into launch fields automatically.
 
 ## FAQ
 
@@ -142,6 +154,10 @@ It works on many systems through mDNS/Avahi. If your phone does not resolve `.lo
 **Can I still port upstream RaspyJack payloads?**
 
 Yes. Keep them under `payloads/`, use the JackPack interface environment variables, and avoid assuming LCD hardware or Pi Zero add-on boards.
+
+**Why does the default install run services as root?**
+
+Some payloads need raw sockets, monitor mode, packet injection, interface changes, and privileged network tooling. The installer keeps the default simple for a dedicated field Pi, while WebUI authentication and the control AP limit casual access. A future hardening pass can split the WebUI into a non-root service with narrow privileged helpers.
 
 ## Credits
 

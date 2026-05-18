@@ -8,7 +8,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/monokai.min.css">
-  <link rel="stylesheet" href="./device-shell.css">
   <link rel="stylesheet" href="./ui.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -215,7 +214,7 @@
     .folder-node.active {
       background-color: rgba(16, 185, 129, 0.18);
     }
-    /* .device-shell and Game Boy theme moved to device-shell.css */
+    /* Payload Studio is headless-first; runtime feedback lives in logs, not LCD mirroring. */
 
     /* File type icons */
     .file-icon {
@@ -392,42 +391,23 @@
         </div>
       </section>
 
-      <!-- Right: handheld preview -->
+      <!-- Right: headless runtime panel -->
       <section class="flex-1 flex flex-col min-w-0 border-l border-slate-800/70 bg-transparent items-center justify-start py-4 px-3 min-h-[260px]">
         <div class="w-full flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
-            <div class="text-xs font-semibold text-emerald-300">Handheld Preview</div>
+            <div class="text-xs font-semibold text-emerald-300">Headless Runtime</div>
             <button id="restartUiBtn" type="button" class="ide-toolbar-btn ide-toolbar-btn--success">
               <i class="fa-solid fa-rotate"></i> Restart UI
             </button>
           </div>
           <div id="wsStatus" class="text-[11px] text-slate-400">Connecting…</div>
         </div>
-        <div id="deviceShell" class="device-shell theme-gameboy rounded-3xl p-4 w-fit mx-auto">
-          <div class="layout-gameboy">
-            <div class="screen-frame">
-              <canvas id="screen-gb" width="128" height="128" class="w-[240px] md:w-[260px]"></canvas>
-            </div>
-            <div class="flex justify-between mb-4">
-              <div class="grid grid-cols-3 grid-rows-3 gap-2">
-                <div></div>
-                <button class="rj-btn" data-btn="UP">▲</button>
-                <div></div>
-                <button class="rj-btn" data-btn="LEFT">◄</button>
-                <button class="rj-btn" data-btn="OK" aria-label="OK"></button>
-                <button class="rj-btn" data-btn="RIGHT">►</button>
-                <div></div>
-                <button class="rj-btn" data-btn="DOWN">▼</button>
-                <div></div>
-              </div>
-              <div class="flex flex-col gap-2 side-buttons">
-                <button class="rj-btn key-btn" data-btn="KEY1">KEY1</button>
-                <button class="rj-btn key-btn" data-btn="KEY2">KEY2</button>
-                <button class="rj-btn key-btn" data-btn="KEY3">KEY3</button>
-              </div>
-            </div>
-            <div class="text-center text-xs text-gray-300">OK = Enter · KEY3 = Esc</div>
-            <div class="status-text text-center text-[11px] text-gray-500 mt-1">Connected</div>
+        <div class="w-full rounded-2xl border border-slate-800/70 bg-slate-950/40 p-4">
+          <div class="text-xs font-semibold text-slate-200 mb-2">Launch Flow</div>
+          <div class="space-y-2 text-xs text-slate-400">
+            <div class="flex items-start gap-2"><i class="fa-solid fa-code text-emerald-300 mt-0.5"></i><span>Edit payloads here, then run them headlessly with arguments from the main dashboard.</span></div>
+            <div class="flex items-start gap-2"><i class="fa-solid fa-list-check text-cyan-300 mt-0.5"></i><span>Payloads with <code>JACKPACK_FORM</code> or <code>argparse</code> options become clean launch forms.</span></div>
+            <div class="flex items-start gap-2"><i class="fa-solid fa-vault text-amber-300 mt-0.5"></i><span>Runtime output lands in <code>loot/</code> and the dashboard log tail.</span></div>
           </div>
         </div>
       </section>

@@ -7,7 +7,6 @@
   <script src="./vendor/js/tailwind.js"></script>
   <link rel="stylesheet" href="./vendor/css/xterm.css">
   <link rel="stylesheet" href="./vendor/css/fontawesome.min.css">
-  <link rel="stylesheet" href="./device-shell.css">
   <link rel="stylesheet" href="./ui.css">
   <link rel="stylesheet" href="./vendor/css/google-fonts.css">
   <style>
@@ -57,156 +56,6 @@
     #lootTab > div {
       box-shadow: var(--rj-shadow);
     }
-    /* shared .device-shell base in device-shell.css */
-
-    /* Theme: Neon (default) */
-    .device-shell.theme-neon,
-    .device-shell[data-theme="neon"] {
-      box-shadow: 0 0 0 1px rgba(116,255,180,.2), 0 0 25px rgba(18,255,120,.15) inset, 0 0 40px rgba(18,255,120,.15);
-      background: linear-gradient(145deg, rgba(15,23,42,.65), rgba(15,23,42,.35));
-      border: 1px solid rgba(16,185,129,.2);
-      backdrop-filter: blur(8px);
-    }
-    .device-shell.theme-neon .rj-btn,
-    .device-shell[data-theme="neon"] .rj-btn {
-      box-shadow: 0 0 0 1px rgba(160,160,255,.25), 0 0 18px rgba(120,120,255,.18) inset;
-    }
-    .device-shell.theme-neon .rj-btn:active,
-    .device-shell.theme-neon .rj-btn.active,
-    .device-shell[data-theme="neon"] .rj-btn:active,
-    .device-shell[data-theme="neon"] .rj-btn.active {
-      filter: brightness(1.2);
-    }
-    .device-shell.theme-neon .screen-frame,
-    .device-shell[data-theme="neon"] .screen-frame {
-      border: 1px solid rgba(16,185,129,.3);
-      background: rgba(0,0,0,.8);
-      box-shadow: 0 0 40px rgba(18,255,120,0.18);
-    }
-
-    /* Theme: Game Boy moved to device-shell.css */
-
-    /* Theme: Pager */
-    .device-shell.theme-pager,
-    .device-shell[data-theme="pager"] {
-      background: #c9c9c9;
-      border-radius: 18px;
-      border: 3px solid #9a9a9a;
-      box-shadow:
-        inset -6px -6px 10px rgba(0,0,0,.25),
-        inset 6px 6px 10px rgba(255,255,255,.25),
-        0 20px 40px rgba(0,0,0,.6);
-    }
-    .device-shell.theme-pager .pager-brand,
-    .device-shell[data-theme="pager"] .pager-brand { display: block; }
-    .device-shell.theme-pager .pager-speaker,
-    .device-shell[data-theme="pager"] .pager-speaker { display: flex; }
-    .device-shell.theme-pager .pager-clip,
-    .device-shell[data-theme="pager"] .pager-clip { display: block; }
-
-    .device-shell.theme-pager .screen-frame,
-    .device-shell[data-theme="pager"] .screen-frame {
-      background: #2b3a2f;
-      padding: 10px;
-      border-radius: 8px;
-      border: 3px solid #555;
-      box-shadow:
-        inset 0 0 12px rgba(0,0,0,.8),
-        0 0 6px rgba(0,255,120,.2);
-    }
-    .device-shell.theme-pager canvas,
-    .device-shell[data-theme="pager"] canvas {
-      image-rendering: pixelated;
-    }
-    .device-shell.theme-pager .rj-btn,
-    .device-shell[data-theme="pager"] .rj-btn {
-      width: 40px;
-      height: 40px;
-      background: #2a2a2a !important;
-      color: #9aff9a;
-      border-radius: 6px;
-      border: 2px solid #111;
-      box-shadow:
-        inset -3px -3px 6px rgba(255,255,255,.08),
-        inset 3px 3px 6px rgba(0,0,0,.6);
-    }
-    .device-shell.theme-pager .rj-btn:active,
-    .device-shell.theme-pager .rj-btn.active,
-    .device-shell[data-theme="pager"] .rj-btn:active,
-    .device-shell[data-theme="pager"] .rj-btn.active {
-      transform: translateY(2px);
-      box-shadow:
-        inset 3px 3px 6px rgba(255,255,255,.08),
-        inset -3px -3px 6px rgba(0,0,0,.6);
-    }
-    .device-shell.theme-pager .key-btn,
-    .device-shell[data-theme="pager"] .key-btn {
-      width: 95px;
-      height: 34px;
-      font-size: 12px;
-      letter-spacing: 1px;
-    }
-    .device-shell.theme-pager .pager-text,
-    .device-shell[data-theme="pager"] .pager-text {
-      color: #111 !important;
-    }
-    .device-shell.theme-pager .layout-default,
-    .device-shell[data-theme="pager"] .layout-default {
-      display: none;
-    }
-    .device-shell.theme-pager .layout-pager,
-    .device-shell[data-theme="pager"] .layout-pager {
-      display: block;
-    }
-
-    .pager-brand {
-      display: none;
-      text-align: center;
-      font-weight: bold;
-      font-size: 13px;
-      color: #222;
-      letter-spacing: 2px;
-      margin-bottom: 10px;
-    }
-    .pager-speaker {
-      display: none;
-      gap: 4px;
-      justify-content: center;
-      margin-bottom: 10px;
-    }
-    .pager-speaker span {
-      width: 6px;
-      height: 6px;
-      background: #444;
-      border-radius: 50%;
-      display: block;
-    }
-    .pager-clip {
-      display: none;
-      position: absolute;
-      right: -10px;
-      top: 40px;
-      width: 8px;
-      height: 90px;
-      background: #777;
-      border-radius: 4px;
-      box-shadow: inset 0 0 4px #000;
-    }
-
-    .theme-nav-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: 9999px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(30,41,59,0.6);
-      border: 1px solid rgba(148,163,184,0.25);
-      transition: all 0.15s ease;
-    }
-    .theme-nav-btn:hover { background: rgba(51,65,85,0.8); }
-    .theme-label { min-width: 120px; text-align: center; }
-
     @keyframes payloadPulse {
       0%   { transform: scale(0.9); opacity: 0.4; }
       50%  { transform: scale(1.4); opacity: 1; }
@@ -318,7 +167,6 @@
     }
 
     #deviceTab .terminal-wrap,
-    #deviceShell,
     #settingsTab > div,
     #lootTab > div {
       border-radius: 16px;
@@ -352,7 +200,7 @@
       </div>
 
       <nav class="p-3 space-y-2 flex-1 min-h-0 overflow-y-auto overscroll-contain">
-        <button id="navDevice" type="button" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-emerald-400/30 bg-emerald-500/10 text-emerald-300 shadow-[0_0_16px_rgba(16,185,129,0.15)]"><i class="fa-solid fa-terminal mr-2"></i>Console</button>
+        <button id="navDevice" type="button" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-emerald-400/30 bg-emerald-500/10 text-emerald-300 shadow-[0_0_16px_rgba(16,185,129,0.15)]"><i class="fa-solid fa-gauge-high mr-2"></i>Dashboard</button>
         <button id="navSystem" type="button" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-slate-400/20 bg-slate-800/40 text-slate-300 hover:text-white hover:bg-slate-700/50 transition"><i class="fa-solid fa-microchip mr-2"></i>System</button>
         <div id="systemDropdown" class="hidden rounded-xl border border-slate-800/80 bg-slate-950/40 p-2 space-y-2">
           <div class="flex items-center justify-between">
@@ -402,6 +250,7 @@
             </div>
           </div>
         </div>
+        <button id="navNetwork" type="button" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-slate-400/20 bg-slate-800/40 text-slate-300 hover:text-white hover:bg-slate-700/50 transition"><i class="fa-solid fa-tower-cell mr-2"></i>Connect</button>
         <button id="navLoot" type="button" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-slate-400/20 bg-slate-800/40 text-slate-300 hover:text-white hover:bg-slate-700/50 transition"><i class="fa-solid fa-vault mr-2"></i>Loot</button>
         <button id="navSettings" type="button" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-slate-400/20 bg-slate-800/40 text-slate-300 hover:text-white hover:bg-slate-700/50 transition"><i class="fa-solid fa-sliders mr-2"></i>Settings</button>
         <a id="navPayloadStudio" href="./ide.html" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-slate-400/20 bg-slate-800/40 text-slate-300 hover:text-white hover:bg-slate-700/50 transition block"><i class="fa-solid fa-code mr-2"></i>Payload Studio</a>
@@ -437,6 +286,13 @@
           <button id="menuToggle" type="button" class="md:hidden px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-600/40 text-slate-200"><i class="fa-solid fa-bars"></i></button>
           <button id="logoutBtn" type="button" class="px-3 py-1.5 text-xs rounded-lg bg-slate-800/80 border border-slate-600/40 text-slate-200 hover:bg-slate-700/80 transition"><i class="fa-solid fa-right-from-bracket mr-1"></i>Logout</button>
         </div>
+      </div>
+
+      <div class="jp-mobile-tabbar" aria-label="Mobile navigation">
+        <button type="button" data-mobile-tab="device" class="jp-mobile-active"><i class="fa-solid fa-gauge-high"></i><span>Home</span></button>
+        <button type="button" data-mobile-tab="network"><i class="fa-solid fa-tower-cell"></i><span>Connect</span></button>
+        <button type="button" data-mobile-tab="loot"><i class="fa-solid fa-vault"></i><span>Loot</span></button>
+        <button type="button" data-mobile-tab="settings"><i class="fa-solid fa-sliders"></i><span>Config</span></button>
       </div>
 
       <!-- Device card -->
@@ -500,11 +356,14 @@
           </div>
         </section>
 
-        <div id="compatDeviceLayout" class="flex flex-col lg:flex-row lg:items-start lg:gap-6">
-          <div class="lg:order-1 order-2 flex-1 min-w-0">
-            <div class="terminal-wrap lg:border-r lg:border-slate-400/20 lg:pr-6">
+        <div id="compatDeviceLayout" class="jp-console-panel">
+          <div class="min-w-0">
+            <div class="terminal-wrap">
               <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800/70">
-                <div class="text-sm font-semibold text-emerald-300">Terminal</div>
+                <div>
+                  <div class="text-sm font-semibold text-emerald-300">Terminal</div>
+                  <div class="text-[11px] text-slate-500">On-demand shell, kept out of the way until you need it.</div>
+                </div>
                 <div class="flex items-center gap-2">
                   <div id="shellStatus" class="text-[11px] text-slate-400">Disconnected</div>
                   <button id="shellConnect" type="button" class="px-3 py-1.5 text-xs rounded-lg bg-emerald-600/80 border border-emerald-300/30 text-white hover:bg-emerald-500/80 transition">Open</button>
@@ -515,132 +374,139 @@
             </div>
           </div>
 
-          <div class="lg:order-2 order-1 flex justify-center lg:justify-end w-full lg:w-auto">
-            <div id="deviceShell" data-theme="neon" class="device-shell theme-neon rounded-3xl p-3 sm:p-4 xl:p-5 w-fit mx-auto lg:mx-0 overflow-hidden" style="max-width:100vw">
-      <div class="pager-clip" aria-hidden="true"></div>
-      <div class="pager-brand">JackPack P5</div>
-      <div class="pager-speaker" aria-hidden="true">
-        <span></span><span></span><span></span><span></span><span></span>
+      </div>
       </div>
 
-      <!-- Default layout (Neon / Pager) -->
-      <div class="layout-default grid grid-cols-2 xl:grid-cols-[120px_auto_120px] gap-3 xl:gap-4 justify-items-center items-center">
-        <!-- Left pad -->
-        <div class="order-2 xl:order-1 flex xl:block justify-center justify-self-start">
-          <div class="grid grid-cols-3 grid-rows-3 gap-1 xl:gap-1.5 w-full xl:w-[120px]">
-            <div></div>
-            <button class="rj-btn dpad-btn rounded-xl bg-slate-800/70 hover:bg-slate-700/70 w-10 h-10 flex items-center justify-center backdrop-blur ring-1 ring-white/10 hover:ring-emerald-400/30 transition" data-btn="UP">▲</button>
-            <div></div>
-            <button class="rj-btn dpad-btn rounded-xl bg-slate-800/70 hover:bg-slate-700/70 w-10 h-10 flex items-center justify-center backdrop-blur ring-1 ring-white/10 hover:ring-emerald-400/30 transition" data-btn="LEFT">◄</button>
-            <button class="rj-btn ok-btn rounded-xl bg-emerald-600/80 hover:bg-emerald-500/80 w-10 h-10 flex items-center justify-center ring-1 ring-emerald-300/40 transition" data-btn="OK" aria-label="OK"></button>
-            <button class="rj-btn dpad-btn rounded-xl bg-slate-800/70 hover:bg-slate-700/70 w-10 h-10 flex items-center justify-center backdrop-blur ring-1 ring-white/10 hover:ring-emerald-400/30 transition" data-btn="RIGHT">►</button>
-            <div></div>
-            <button class="rj-btn dpad-btn rounded-xl bg-slate-800/70 hover:bg-slate-700/70 w-10 h-10 flex items-center justify-center backdrop-blur ring-1 ring-white/10 hover:ring-emerald-400/30 transition" data-btn="DOWN">▼</button>
-            <div></div>
-          </div>
-        </div>
-
-        <!-- Screen -->
-        <div class="order-1 xl:order-2 col-span-2 xl:col-span-1">
-          <div class="screen-frame rounded-2xl p-2">
-            <div class="flex items-center justify-center">
-              <canvas id="screen" width="128" height="128" class="w-full xl:w-[300px]"></canvas>
+      <!-- Network control -->
+      <div id="networkTab" class="hidden space-y-4">
+        <section class="jp-hero">
+          <div class="jp-hero-main">
+            <div class="text-[11px] uppercase tracking-[0.18em] text-emerald-300">Network Control</div>
+            <h1>Connect</h1>
+            <div class="jp-hero-meta">
+              <span>Use the USB WiFi adapter for payload networks</span>
+              <span>Control AP stays protected</span>
             </div>
           </div>
+          <div class="jp-hero-payload">
+            <div class="text-[11px] uppercase tracking-[0.16em] text-slate-500">Status</div>
+            <div id="networkStatus" class="mt-1 text-lg font-semibold text-slate-100">Ready</div>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button id="networkRefresh" type="button" class="jp-btn"><i class="fa-solid fa-rotate"></i> Refresh</button>
+              <button id="networkDisconnect" type="button" class="jp-btn jp-btn-muted"><i class="fa-solid fa-plug-circle-xmark"></i> Disconnect</button>
+            </div>
+          </div>
+        </section>
 
-          <div class="pager-text mt-2 text-center text-xs text-slate-400">OK = Enter · KEY3 = Esc</div>
-          <div id="status" class="status-text pager-text mt-1 text-center text-[11px] text-slate-500">Connecting…</div>
-        </div>
+        <section class="grid grid-cols-1 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] gap-4">
+          <div class="jp-panel">
+            <div class="jp-panel-head">
+              <div>
+                <div class="jp-panel-title">Interfaces</div>
+                <div class="jp-panel-subtitle">Internal AP, external WiFi, and built-in Ethernet</div>
+              </div>
+            </div>
+            <div id="networkInterfaces" class="space-y-2"></div>
+          </div>
 
-        <!-- Right buttons -->
-        <div class="order-3 flex flex-col items-stretch gap-2 justify-self-end w-full xl:w-auto">
-          <button class="rj-btn key-btn rounded-xl bg-fuchsia-700/80 hover:bg-fuchsia-600/80 px-3 py-2 w-full xl:w-24 ring-1 ring-white/10 transition" data-btn="KEY1">KEY1</button>
-          <button class="rj-btn key-btn rounded-xl bg-fuchsia-700/80 hover:bg-fuchsia-600/80 px-3 py-2 w-full xl:w-24 ring-1 ring-white/10 transition" data-btn="KEY2">KEY2</button>
-          <button class="rj-btn key-btn rounded-xl bg-fuchsia-700/80 hover:bg-fuchsia-600/80 px-3 py-2 w-full xl:w-24 ring-1 ring-white/10 transition" data-btn="KEY3">KEY3</button>
-        </div>
-      </div>
+          <div class="jp-panel">
+            <div class="jp-panel-head">
+              <div>
+                <div class="jp-panel-title">WiFi Client</div>
+                <div class="jp-panel-subtitle">Connect the Pi or adapter to a network</div>
+              </div>
+              <button id="networkScan" type="button" class="jp-btn"><i class="fa-solid fa-magnifying-glass"></i> Scan</button>
+            </div>
 
-      <!-- Game Boy layout -->
-      <div class="layout-gameboy hidden">
-        <div class="screen-frame">
-          <canvas id="screen-gb" width="128" height="128" class="w-full xl:w-[300px]"></canvas>
-        </div>
-        <div class="flex justify-between mb-4">
-          <div class="grid grid-cols-3 grid-rows-3 gap-2">
-            <div></div>
-            <button class="rj-btn" data-btn="UP">▲</button>
-            <div></div>
-            <button class="rj-btn" data-btn="LEFT">◄</button>
-            <button class="rj-btn" data-btn="OK" aria-label="OK"></button>
-            <button class="rj-btn" data-btn="RIGHT">►</button>
-            <div></div>
-            <button class="rj-btn" data-btn="DOWN">▼</button>
-            <div></div>
-          </div>
-          <div class="flex flex-col gap-2 side-buttons">
-            <button class="rj-btn key-btn" data-btn="KEY1">KEY1</button>
-            <button class="rj-btn key-btn" data-btn="KEY2">KEY2</button>
-            <button class="rj-btn key-btn" data-btn="KEY3">KEY3</button>
-          </div>
-        </div>
-        <div class="text-center text-xs text-gray-300">OK = Enter · KEY3 = Esc</div>
-        <div class="status-text text-center text-[11px] text-gray-500 mt-1">Connecting…</div>
-      </div>
+            <label class="jp-field">
+              <span>Interface</span>
+              <select id="networkIface"></select>
+            </label>
 
-      <!-- Pager layout -->
-      <div class="layout-pager hidden">
-        <div class="screen-frame">
-          <canvas id="screen-pager" width="128" height="128" class="w-full xl:w-[300px]"></canvas>
-        </div>
-        <div class="flex justify-between mb-4 mt-4">
-          <div class="grid grid-cols-3 grid-rows-3 gap-2">
-            <div></div>
-            <button class="rj-btn" data-btn="UP">▲</button>
-            <div></div>
-            <button class="rj-btn" data-btn="LEFT">◄</button>
-            <button class="rj-btn" data-btn="OK" aria-label="OK"></button>
-            <button class="rj-btn" data-btn="RIGHT">►</button>
-            <div></div>
-            <button class="rj-btn" data-btn="DOWN">▼</button>
-            <div></div>
+            <div id="networkList" class="jp-network-list mt-3">
+              <div class="text-xs text-slate-500 p-3">No networks loaded. Pick an interface and scan.</div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-[1fr_220px] gap-3">
+              <div>
+                <div class="text-[11px] uppercase tracking-[0.14em] text-slate-500">Selected Network</div>
+                <div id="networkSelected" class="mt-1 text-sm font-semibold text-slate-100">Select a network</div>
+                <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <label class="jp-check-row">
+                    <input id="networkOpen" type="checkbox">
+                    <span><strong>Open network</strong><small>No password required</small></span>
+                  </label>
+                  <label class="jp-check-row">
+                    <input id="networkHidden" type="checkbox">
+                    <span><strong>Hidden SSID</strong><small>Use selected SSID as hidden</small></span>
+                  </label>
+                </div>
+                <label class="jp-check-row mt-2 jp-danger-row">
+                  <input id="networkForceControl" type="checkbox">
+                  <span><strong>Allow control AP changes</strong><small>May disconnect your phone from JackPack</small></span>
+                </label>
+              </div>
+              <div class="space-y-2">
+                <label class="jp-field">
+                  <span>Password</span>
+                  <input id="networkPassword" type="password" autocomplete="off" placeholder="Network password">
+                </label>
+                <button id="networkConnect" type="button" class="jp-btn jp-btn-primary w-full"><i class="fa-solid fa-link"></i> Connect</button>
+              </div>
+            </div>
           </div>
-          <div class="flex flex-col gap-2 side-buttons">
-            <button class="rj-btn key-btn" data-btn="KEY1">KEY1</button>
-            <button class="rj-btn key-btn" data-btn="KEY2">KEY2</button>
-            <button class="rj-btn key-btn" data-btn="KEY3">KEY3</button>
-          </div>
-        </div>
-        <div class="pager-text text-center text-[11px] mt-4">OK = Enter · KEY3 = Esc</div>
-        <div class="status-text pager-text text-center text-[10px] mt-1">Connecting…</div>
-          </div>
-        </div>
-      </div>
-      </div>
+        </section>
       </div>
 
       <!-- Settings -->
       <div id="settingsTab" class="hidden">
-        <div class="rounded-3xl border border-slate-700/60 bg-slate-900/40 backdrop-blur p-4 md:p-5 max-w-3xl mx-auto shadow-[0_0_30px_rgba(15,23,42,0.35)] space-y-4">
+        <div class="rounded-3xl border border-slate-700/60 bg-slate-900/40 backdrop-blur p-4 md:p-5 max-w-5xl mx-auto shadow-[0_0_30px_rgba(15,23,42,0.35)] space-y-4">
           <div class="flex items-center justify-between">
-            <div class="text-sm font-semibold text-emerald-300">Settings</div>
-            <div class="text-[11px] text-slate-400">Current theme: <span id="themeName">Neon</span></div>
-          </div>
-
-          <div class="rounded-xl border border-slate-800/70 bg-slate-950/40 p-3">
-            <div class="text-xs font-semibold text-slate-200 mb-2">Themes</div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <button type="button" data-theme="neon" class="px-3 py-2 rounded-lg text-left text-xs font-semibold border border-slate-500/20 bg-slate-900/40 text-slate-300 hover:bg-slate-800/60 transition">Neon</button>
-              <button type="button" data-theme="gameboy" class="px-3 py-2 rounded-lg text-left text-xs font-semibold border border-slate-500/20 bg-slate-900/40 text-slate-300 hover:bg-slate-800/60 transition">Game Boy</button>
-              <button type="button" data-theme="pager" class="px-3 py-2 rounded-lg text-left text-xs font-semibold border border-slate-500/20 bg-slate-900/40 text-slate-300 hover:bg-slate-800/60 transition">Pager</button>
+            <div>
+              <div class="text-sm font-semibold text-emerald-300">JackPack Config</div>
+              <div class="text-[11px] text-slate-500">Installer values, updater, and service integrations.</div>
             </div>
           </div>
 
           <div class="rounded-xl border border-slate-800/70 bg-slate-950/40 p-3">
-            <div class="text-xs font-semibold text-slate-200 mb-2">Screen Size</div>
-            <div class="flex items-center gap-3">
-              <input id="screenSizeSlider" type="range" min="50" max="400" value="100" step="25" class="flex-1 h-1 accent-emerald-500 cursor-pointer">
-              <span id="screenSizeLabel" class="text-xs text-emerald-300 font-mono w-10 text-right">x1.0</span>
+            <div class="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <div class="text-xs font-semibold text-slate-200">Runtime Config</div>
+                <div class="text-[11px] text-slate-500">Saved to the JackPack env file. Service restart or reboot applies network changes.</div>
+              </div>
+              <div id="configStatus" class="text-[11px] text-slate-400">Ready</div>
             </div>
+            <div class="jp-form-grid">
+              <label class="jp-field"><span>Control AP Interface</span><input id="configApIface" type="text" autocomplete="off" placeholder="wlan0"></label>
+              <label class="jp-field"><span>External WiFi Interface</span><input id="configAttackIface" type="text" autocomplete="off" placeholder="wlan1"></label>
+              <label class="jp-field"><span>Built-in Ethernet</span><input id="configWiredIface" type="text" autocomplete="off" placeholder="eth0"></label>
+              <label class="jp-field"><span>AP SSID</span><input id="configApSsid" type="text" autocomplete="off" placeholder="JackPack"></label>
+              <label class="jp-field"><span>AP Password</span><input id="configApPassword" type="password" autocomplete="new-password" placeholder="New AP password"></label>
+              <label class="jp-field"><span>Hostname</span><input id="configHostname" type="text" autocomplete="off" placeholder="jackpack"></label>
+              <label class="jp-field"><span>AP Address</span><input id="configApAddress" type="text" autocomplete="off" placeholder="10.66.0.1/24"></label>
+              <label class="jp-field"><span>AP Channel</span><input id="configApChannel" type="number" min="1" max="165" placeholder="6"></label>
+              <label class="jp-field"><span>WebUI Port</span><input id="configWebPort" type="number" min="1" max="65535" placeholder="8080"></label>
+              <label class="jp-field"><span>WebSocket Port</span><input id="configWsPort" type="number" min="1" max="65535" placeholder="8765"></label>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button id="configSave" type="button" class="jp-btn jp-btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Config</button>
+              <button id="configReload" type="button" class="jp-btn jp-btn-muted"><i class="fa-solid fa-rotate"></i> Reload</button>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-slate-800/70 bg-slate-950/40 p-3">
+            <div class="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <div class="text-xs font-semibold text-slate-200">Auto Update</div>
+                <div class="text-[11px] text-slate-500">Pulls latest <code>origin/main</code> with a fast-forward update.</div>
+              </div>
+              <div id="updateStatus" class="text-[11px] text-slate-400">Ready</div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button id="updatePull" type="button" class="jp-btn jp-btn-primary"><i class="fa-solid fa-cloud-arrow-down"></i> Pull Latest</button>
+              <button id="updateRestart" type="button" class="jp-btn jp-btn-muted"><i class="fa-solid fa-power-off"></i> Restart WebUI</button>
+            </div>
+            <pre id="updateOutput" class="jp-log mt-3 min-h-[8rem] max-h-[14rem]">No update run yet.</pre>
           </div>
 
           <div class="rounded-xl border border-slate-800/70 bg-slate-950/40 p-3">
@@ -707,6 +573,32 @@
       </div>
 
     </main>
+  </div>
+
+  <!-- Payload launch modal -->
+  <div id="payloadLaunchModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm">
+    <div class="max-w-2xl mx-auto mt-6 md:mt-12 px-4 pb-6">
+      <div class="rounded-2xl border border-slate-700/60 bg-slate-950/95 shadow-[0_0_40px_rgba(15,23,42,0.7)] overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-800/70 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div id="payloadLaunchTitle" class="text-sm font-semibold text-emerald-300 truncate">Launch Payload</div>
+            <div id="payloadLaunchMeta" class="text-[11px] text-slate-500 mt-1 truncate"></div>
+          </div>
+          <button id="payloadLaunchClose" type="button" class="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded-md bg-slate-900/60 border border-slate-700/60">x</button>
+        </div>
+        <div class="px-4 py-4 space-y-3 max-h-[72vh] overflow-auto">
+          <div id="payloadLaunchForm" class="jp-form-grid"></div>
+          <label class="jp-field">
+            <span>Raw Args</span>
+            <input id="payloadLaunchRaw" type="text" autocomplete="off" placeholder='Optional flags, for example --iface wlan1 --target 10.0.0.5'>
+          </label>
+        </div>
+        <div class="px-4 py-3 border-t border-slate-800/70 flex justify-end gap-2">
+          <button id="payloadLaunchCancel" type="button" class="jp-btn jp-btn-muted">Cancel</button>
+          <button id="payloadLaunchConfirm" type="button" class="jp-btn jp-btn-primary"><i class="fa-solid fa-play"></i> Launch</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Loot preview modal -->
