@@ -321,9 +321,30 @@
   </div>
 </div>
 
+<script src="./shared.js"></script>
 <script src="./vendor/leaflet/leaflet.js"></script>
 <script>
 L.Icon.Default.prototype.options.imagePath = './vendor/leaflet/';
+
+const AUTH_STORAGE_KEY = "rj.authToken";
+let authToken = "";
+try {
+  authToken = String(sessionStorage.getItem(AUTH_STORAGE_KEY) || "").trim();
+  const u = new URL(window.location.href);
+  const token = String(u.searchParams.get("token") || "").trim();
+  if (token) {
+    authToken = token;
+    sessionStorage.setItem(AUTH_STORAGE_KEY, token);
+    u.searchParams.delete("token");
+    window.history.replaceState({}, "", u.toString());
+  }
+} catch(e) {}
+
+function apiFetch(path, options) {
+  const headers = Object.assign({}, (options && options.headers) || {});
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
+  return fetch(path, Object.assign({ credentials: "include" }, options || {}, { headers }));
+}
 
 const canvasRenderer = L.canvas({padding:0.5});
 const map = L.map('map', {zoomControl:false, preferCanvas:true}).setView([49.18,-0.37],14);
@@ -824,7 +845,7 @@ function tlSetSpeed(val) { replaySpeed = parseFloat(val); }
 // --- Data loading ---
 async function loadSessionList() {
   try {
-    const r = await fetch('/api/wardriving/sessions', {credentials:'include'});
+    const r = await apiFetch('/api/wardriving/sessions');
     if (r.ok) {
       const s = await r.json();
       const sel = document.getElementById('sessionSel');
@@ -843,7 +864,7 @@ async function loadSession() {
   const path = document.getElementById('sessionSel').value;
   if (!path) return;
   try {
-    const r = await fetch(`/api/wardriving/session?path=${encodeURIComponent(path)}`, {credentials:'include'});
+    const r = await apiFetch(`/api/wardriving/session?path=${encodeURIComponent(path)}`);
     if (r.ok) {
       allNets = parseCSV(await r.text());
       if (replayActive) toggleReplay();
@@ -854,7 +875,7 @@ async function loadSession() {
 
 async function loadLive() {
   try {
-    const r = await fetch('/api/wardriving/live', {credentials:'include'});
+    const r = await apiFetch('/api/wardriving/live');
     if (r.ok) {
       const fresh = parseCSV(await r.text());
       const m = new Map(allNets.map(n=>[n.mac,n]));
@@ -871,10 +892,10 @@ async function toggleLive() {
   if (liveInterval) {
     clearInterval(liveInterval); liveInterval=null;
     btn.classList.remove('active'); dot.style.display='none';
-    try { await fetch('/api/wardriving/stop', {method:'POST', credentials:'include'}); } catch(e){}
+    try { await apiFetch('/api/wardriving/stop', {method:'POST'}); } catch(e){}
   } else {
     try {
-      const r = await fetch('/api/wardriving/start', {method:'POST', credentials:'include'});
+      const r = await apiFetch('/api/wardriving/start', {method:'POST'});
       if (!r.ok) { alert('Failed to start wardriving'); return; }
     } catch(e) { alert('Connection error'); return; }
     btn.classList.add('active'); dot.style.display='inline';

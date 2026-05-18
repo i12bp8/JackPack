@@ -22,6 +22,7 @@
   const navDevice = document.getElementById("navDevice");
   const navSystem = document.getElementById("navSystem");
   const navNetwork = document.getElementById("navNetwork");
+  const navPayloads = document.getElementById("navPayloads");
   const navLoot = document.getElementById("navLoot");
   const navSettings = document.getElementById("navSettings");
   const navPayloadStudio = document.getElementById("navPayloadStudio");
@@ -29,6 +30,7 @@
   const sidebarBackdrop = document.getElementById("sidebarBackdrop");
   const menuToggle = document.getElementById("menuToggle");
   const deviceTab = document.getElementById("deviceTab");
+  const payloadTab = document.getElementById("payloadTab");
   const networkTab = document.getElementById("networkTab");
   const systemDropdown = document.getElementById("systemDropdown");
   const settingsTab = document.getElementById("settingsTab");
@@ -73,6 +75,13 @@
   const payloadsRefresh = document.getElementById("payloadsRefresh");
   const payloadsRefreshMain = document.getElementById("payloadsRefreshMain");
   const payloadQuickGrid = document.getElementById("payloadQuickGrid");
+  const payloadSearch = document.getElementById("payloadSearch");
+  const payloadCategoryList = document.getElementById("payloadCategoryList");
+  const payloadCategoryTitle = document.getElementById("payloadCategoryTitle");
+  const payloadCategoryDescription = document.getElementById("payloadCategoryDescription");
+  const payloadLibraryActive = document.getElementById("payloadLibraryActive");
+  const payloadLibraryStop = document.getElementById("payloadLibraryStop");
+  const payloadLibraryRefresh = document.getElementById("payloadLibraryRefresh");
   const payloadSummary = document.getElementById("payloadSummary");
   const payloadLogTail = document.getElementById("payloadLogTail");
   const payloadLogRefresh = document.getElementById("payloadLogRefresh");
@@ -600,7 +609,13 @@
   let activeTab = "device";
   let lootState = { path: "", parent: "" };
   let nmapVizState = { data: null, jsonUrl: "" };
-  let payloadState = { categories: [], open: {}, activePath: null };
+  let payloadState = {
+    categories: [],
+    open: {},
+    activePath: null,
+    selectedCategory: "",
+    query: "",
+  };
   let networkState = { interfaces: [], selectedNetwork: null };
   let payloadLaunchState = { path: "", schema: null };
   let term = null;
@@ -677,6 +692,9 @@
     if (activePayloadTitle) {
       activePayloadTitle.textContent = running ? payloadLabel(path) : "None";
     }
+    if (payloadLibraryActive) {
+      payloadLibraryActive.textContent = running ? payloadLabel(path) : "None";
+    }
     if (activePayloadMeta) {
       if (!running) {
         activePayloadMeta.textContent = "Ready";
@@ -688,6 +706,9 @@
     }
     if (activePayloadStop) {
       activePayloadStop.classList.toggle("hidden", !running);
+    }
+    if (payloadLibraryStop) {
+      payloadLibraryStop.classList.toggle("hidden", !running);
     }
   }
 
@@ -805,11 +826,13 @@
     activeTab = tab;
     const isDevice = tab === "device";
     if (deviceTab) deviceTab.classList.toggle("hidden", !isDevice);
+    if (payloadTab) payloadTab.classList.toggle("hidden", tab !== "payloads");
     if (networkTab) networkTab.classList.toggle("hidden", tab !== "network");
     if (settingsTab) settingsTab.classList.toggle("hidden", tab !== "settings");
     if (lootTab) lootTab.classList.toggle("hidden", tab !== "loot");
     setNavActive(navDevice, isDevice);
     setNavActive(navNetwork, tab === "network");
+    setNavActive(navPayloads, tab === "payloads");
     setNavActive(navLoot, tab === "loot");
     setNavActive(navSettings, tab === "settings");
     document.querySelectorAll("[data-mobile-tab]").forEach((btn) => {
@@ -938,6 +961,7 @@
         }
         if (msg.type === "shell_ready") {
           shellOpen = true;
+          terminalEl?.closest(".terminal-wrap")?.classList.add("shell-open");
           setShellStatus("Connected");
           sendShellResize();
           return;
@@ -949,6 +973,7 @@
         }
         if (msg.type === "shell_exit") {
           shellOpen = false;
+          terminalEl?.closest(".terminal-wrap")?.classList.remove("shell-open");
           setShellStatus("Exited");
         }
       } catch {}
@@ -958,6 +983,7 @@
       setStatus("Disconnected – reconnecting…");
       setShellStatus("Disconnected");
       shellOpen = false;
+      terminalEl?.closest(".terminal-wrap")?.classList.remove("shell-open");
       scheduleReconnect();
     };
 
@@ -1033,6 +1059,7 @@
     shellWanted = true;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     ensureTerminal();
+    terminalEl?.closest(".terminal-wrap")?.classList.add("shell-open");
     setShellStatus("Opening...");
     try {
       ws.send(JSON.stringify({ type: "shell_open" }));
@@ -1047,6 +1074,7 @@
       } catch {}
     }
     shellOpen = false;
+    terminalEl?.closest(".terminal-wrap")?.classList.remove("shell-open");
     setShellStatus("Closed");
   }
 
@@ -1367,6 +1395,8 @@
           password: isOpen || !networkPassword ? "" : networkPassword.value,
           hidden: !!(networkHidden && networkHidden.checked),
           force_control_iface: !!(networkForceControl && networkForceControl.checked),
+          security: net && net.security ? net.security : "",
+          bssid: net && net.bssid ? net.bssid : "",
         }),
       });
       const data = await res.json();
@@ -1377,6 +1407,7 @@
       } else {
         await loadNetworkStatus();
       }
+      if (networkPassword) networkPassword.value = "";
       setNetworkStatus("Connected");
     } catch (e) {
       setNetworkStatus(e && e.message ? e.message : "Connect failed");
@@ -2367,7 +2398,11 @@
           payloadState.open[cat.id] = idx === 0;
         }
       });
+      if (!payloadState.selectedCategory && payloadState.categories.length) {
+        payloadState.selectedCategory = payloadState.categories[0].id || "";
+      }
       renderPayloadSidebar();
+      renderPayloadCategories();
       renderPayloadQuickGrid();
       setPayloadStatus("Ready");
     } catch (e) {
@@ -2378,6 +2413,9 @@
       if (payloadQuickGrid)
         payloadQuickGrid.innerHTML =
           '<div class="text-xs text-slate-500">No payloads available.</div>';
+      if (payloadCategoryList)
+        payloadCategoryList.innerHTML =
+          '<div class="text-xs text-slate-500">No categories available.</div>';
     }
   }
 
@@ -2394,42 +2432,55 @@
         const catId = String(cat?.id || "");
         const catIdEncoded = encodeData(catId);
         const catLabel = escapeHtml(String(cat?.label || catId || "Category"));
-        const isOpen = !!payloadState.open[catId];
-        const items = (cat.items || [])
-          .map((item) => {
-            const itemName = escapeHtml(String(item?.name || "payload"));
-            const itemPath = String(item?.path || "");
-            const itemPathEncoded = encodeData(itemPath);
-            const isActive = payloadState.activePath === itemPath;
-            const disabled = !!payloadState.activePath;
-            const startCls = disabled
-              ? "px-2 py-0.5 text-[10px] rounded-md bg-slate-800/80 border border-slate-700/40 text-slate-500 cursor-not-allowed"
-              : "px-2 py-0.5 text-[10px] rounded-md bg-emerald-600/80 border border-emerald-300/30 text-white hover:bg-emerald-500/80 transition";
-            const stopBtn = isActive
-              ? '<button type="button" data-stop="1" class="px-2 py-0.5 text-[10px] rounded-md bg-rose-600/80 border border-rose-300/30 text-white hover:bg-rose-500/80 transition">Stop</button>'
-              : '<span class="px-2 py-0.5 text-[10px] rounded-md bg-slate-900/60 border border-slate-800/40 text-slate-600">Idle</span>';
-            return `
-        <div class="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-slate-900/40 border border-slate-800/70">
-          <div class="text-[11px] text-slate-200 truncate">${itemName}</div>
-          <div class="flex items-center gap-1">
-            <button type="button" data-start="${itemPathEncoded}" ${disabled ? "disabled" : ""} class="${startCls}">Start</button>
-            ${stopBtn}
-          </div>
-        </div>
-      `;
-          })
-          .join("");
+        const isSelected = payloadState.selectedCategory === catId;
+        const count = Array.isArray(cat.items) ? cat.items.length : 0;
         return `
-        <div class="rounded-xl border border-slate-800/70 bg-slate-950/40">
-          <button type="button" data-cat="${catIdEncoded}" class="w-full px-3 py-2 text-left text-xs font-semibold text-slate-200 flex items-center justify-between">
+        <button type="button" data-cat="${catIdEncoded}" class="w-full px-3 py-2 text-left text-xs font-semibold flex items-center justify-between rounded-lg border ${isSelected ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200" : "border-slate-800/70 bg-slate-950/40 text-slate-300"}">
             <span>${catLabel}</span>
-            <span class="text-slate-400">${isOpen ? "▾" : "▸"}</span>
-          </button>
-          <div class="${isOpen ? "" : "hidden"} px-2 pb-2 space-y-1">
-            ${items || '<div class="text-[11px] text-slate-500 px-1">Empty</div>'}
-          </div>
-        </div>
+            <span class="text-slate-500">${count}</span>
+        </button>
       `;
+      })
+      .join("");
+  }
+
+  function allPayloadItems() {
+    const items = [];
+    (payloadState.categories || []).forEach((cat) => {
+      (cat.items || []).forEach((item) => {
+        items.push({ ...item, category: cat.label || cat.id || "Payloads", categoryId: cat.id || "" });
+      });
+    });
+    return items;
+  }
+
+  function selectPayloadCategory(id) {
+    const cats = payloadState.categories || [];
+    payloadState.selectedCategory = id || (cats[0] && cats[0].id) || "";
+    renderPayloadSidebar();
+    renderPayloadCategories();
+    renderPayloadQuickGrid();
+  }
+
+  function renderPayloadCategories() {
+    if (!payloadCategoryList) return;
+    const cats = payloadState.categories || [];
+    if (!cats.length) {
+      payloadCategoryList.innerHTML = '<div class="text-xs text-slate-500">No payload categories.</div>';
+      return;
+    }
+    payloadCategoryList.innerHTML = cats
+      .map((cat) => {
+        const id = String(cat.id || "");
+        const selected = id === payloadState.selectedCategory;
+        const count = Array.isArray(cat.items) ? cat.items.length : 0;
+        return `<button type="button" data-payload-category="${encodeData(id)}" class="jp-category-card ${selected ? "jp-category-active" : ""}">
+          <div class="jp-category-top">
+            <div class="jp-category-title">${escapeHtml(cat.label || id || "Category")}</div>
+            <div class="jp-category-count">${count}</div>
+          </div>
+          <div class="jp-category-meta">${escapeHtml(cat.description || "Payload workflows")}</div>
+        </button>`;
       })
       .join("");
   }
@@ -2437,39 +2488,78 @@
   function renderPayloadQuickGrid() {
     if (!payloadQuickGrid) return;
     const cats = payloadState.categories || [];
-    const items = [];
-    cats.forEach((cat) => {
-      (cat.items || []).forEach((item) => {
-        items.push({ ...item, category: cat.label || cat.id || "Payloads" });
+    if (!payloadState.selectedCategory && cats.length) {
+      payloadState.selectedCategory = cats[0].id || "";
+    }
+    const selectedCat = cats.find((cat) => cat.id === payloadState.selectedCategory) || cats[0] || null;
+    const query = String(payloadState.query || "").trim().toLowerCase();
+    let items = query
+      ? allPayloadItems()
+      : (selectedCat?.items || []).map((item) => ({
+          ...item,
+          category: selectedCat.label || selectedCat.id || "Payloads",
+          categoryId: selectedCat.id || "",
+        }));
+    if (query) {
+      items = items.filter((item) => {
+        const meta = item.meta || {};
+        const haystack = [
+          item.name,
+          item.path,
+          item.category,
+          meta.description,
+          ...(Array.isArray(meta.tags) ? meta.tags : []),
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(query);
       });
-    });
+    }
+    const total = allPayloadItems().length;
     if (payloadSummary) {
-      payloadSummary.textContent = `${items.length} payloads across ${cats.length} categories`;
+      payloadSummary.innerHTML = `<span>${total} payloads</span><span>${cats.length} categories</span>`;
+    }
+    if (payloadCategoryTitle) {
+      payloadCategoryTitle.textContent = query
+        ? `Search Results`
+        : selectedCat
+          ? selectedCat.label || "Payloads"
+          : "Payloads";
+    }
+    if (payloadCategoryDescription) {
+      payloadCategoryDescription.textContent = query
+        ? `${items.length} matches for "${payloadState.query}"`
+        : selectedCat
+          ? selectedCat.description || `${items.length} payloads`
+          : "Select a category.";
     }
     if (!items.length) {
-      payloadQuickGrid.innerHTML = '<div class="text-xs text-slate-500">No payloads available.</div>';
+      payloadQuickGrid.innerHTML = '<div class="jp-empty-form">No payloads match this view.</div>';
       return;
     }
     payloadQuickGrid.innerHTML = items
-      .slice(0, 72)
       .map((item) => {
         const itemPath = String(item.path || "");
         const encoded = encodeData(itemPath);
         const meta = item.meta || {};
         const tags = Array.isArray(meta.tags) && meta.tags.length ? meta.tags : [String(item.category || "payload")];
+        const description = meta.description || "No description yet. Open Payload Studio to add metadata or a module docstring.";
         const disabled = !!payloadState.activePath;
         const isActive = payloadState.activePath === itemPath;
         const action = isActive
-          ? '<button type="button" data-stop="1" class="mt-3 px-3 py-1.5 text-xs rounded-lg bg-rose-600/80 border border-rose-300/30 text-white hover:bg-rose-500/80 transition">Stop</button>'
-          : `<button type="button" data-start="${encoded}" ${disabled ? "disabled" : ""} class="mt-3 px-3 py-1.5 text-xs rounded-lg ${disabled ? "bg-slate-800/80 border border-slate-700/50 text-slate-500 cursor-not-allowed" : "bg-emerald-600/80 border border-emerald-300/30 text-white hover:bg-emerald-500/80 transition"}">Start</button>`;
+          ? '<button type="button" data-stop="1" class="jp-btn jp-btn-danger"><i class="fa-solid fa-stop"></i> Stop</button>'
+          : `<button type="button" data-start="${encoded}" ${disabled ? "disabled" : ""} class="jp-btn ${disabled ? "opacity-50 cursor-not-allowed" : "jp-btn-primary"}"><i class="fa-solid fa-play"></i> Configure</button>`;
         return `
           <div class="jp-payload-card">
-            <div>
-              <div class="jp-payload-name">${escapeHtml(payloadLabel(itemPath))}</div>
-              <div class="jp-payload-path">${escapeHtml(itemPath)}</div>
-              <div class="jp-tag-row">${tags.slice(0, 4).map((tag) => `<span class="jp-tag">${escapeHtml(String(tag))}</span>`).join("")}</div>
+            <div class="jp-payload-row">
+              <div class="min-w-0">
+                <div class="jp-payload-name">${escapeHtml(payloadLabel(itemPath))}</div>
+                <div class="jp-payload-path">${escapeHtml(itemPath)}</div>
+                <div class="jp-payload-desc">${escapeHtml(description)}</div>
+                <div class="jp-tag-row">${tags.slice(0, 5).map((tag, idx) => `<span class="jp-tag ${idx === 0 ? "jp-tag-purple" : ""}">${escapeHtml(String(tag))}</span>`).join("")}</div>
+              </div>
+              ${action}
             </div>
-            ${action}
           </div>
         `;
       })
@@ -2528,16 +2618,25 @@
           const label = escapeHtml(field.label || field.name || "Option");
           const help = field.help ? `<div class="jp-field-help">${escapeHtml(field.help)}</div>` : "";
           const required = field.required ? "required" : "";
+          const envAttr = field.env ? `data-env="${escapeHtml(field.env)}"` : "";
           const def = field.default === undefined || field.default === null ? "" : String(field.default);
           if (field.type === "checkbox") {
             const checked = field.default === true ? "checked" : "";
             return `<label class="jp-check-row">
-              <input type="checkbox" data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${checked}>
+              <input type="checkbox" data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} ${checked}>
               <span><strong>${label}</strong>${help}</span>
             </label>`;
           }
           if (field.type === "interface") {
-            const interfaces = (networkState.interfaces || []).filter((item) => item.present || item.recommended || item.protected);
+            const ifaceType = String(field.iface_type || "").toLowerCase();
+            const needsMonitor = !!field.require_monitor;
+            const interfaces = (networkState.interfaces || []).filter((item) => {
+              if (!(item.present || item.recommended || item.protected)) return false;
+              if (ifaceType === "wifi") return !!item.wireless;
+              if (ifaceType === "eth" || ifaceType === "wired") return !item.wireless;
+              if (needsMonitor) return !!item.wireless;
+              return true;
+            });
             const options = interfaces.length
               ? interfaces.map((item) => {
                   const value = String(item.name || "");
@@ -2547,7 +2646,7 @@
               : `<option value="${escapeHtml(def || "wlan1")}">${escapeHtml(def || "wlan1")}</option>`;
             return `<label class="jp-field">
               <span>${label}</span>
-              <select data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${required}>
+              <select data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} ${required}>
                 ${options}
               </select>
               ${help}
@@ -2556,7 +2655,7 @@
           if (field.type === "select" && Array.isArray(field.choices)) {
             return `<label class="jp-field">
               <span>${label}</span>
-              <select data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${required}>
+              <select data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} ${required}>
                 <option value="">Default</option>
                 ${field.choices.map((choice) => `<option value="${escapeHtml(choice)}" ${choice === def ? "selected" : ""}>${escapeHtml(choice)}</option>`).join("")}
               </select>
@@ -2565,7 +2664,7 @@
           }
           return `<label class="jp-field">
             <span>${label}</span>
-            <input type="${field.type === "number" ? "number" : "text"}" data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" value="${escapeHtml(def)}" ${required}>
+            <input type="${field.type === "number" ? "number" : "text"}" data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} value="${escapeHtml(def)}" ${required}>
             ${help}
           </label>`;
         })
@@ -2598,41 +2697,44 @@
 
   function buildPayloadArgsFromForm() {
     const args = [];
+    const env = {};
     if (payloadLaunchForm) {
       payloadLaunchForm.querySelectorAll("[data-payload-field]").forEach((el) => {
         const arg = el.getAttribute("data-arg") || "";
-        if (!arg) return;
+        const envKey = el.getAttribute("data-env") || "";
         if (el.type === "checkbox") {
-          if (el.checked) args.push(arg);
+          if (envKey) env[envKey] = el.checked ? "1" : "0";
+          else if (arg && el.checked) args.push(arg);
           return;
         }
         const value = String(el.value || "").trim();
         if (!value) return;
-        args.push(arg, value);
+        if (envKey) env[envKey] = value;
+        else if (arg) args.push(arg, value);
       });
     }
     if (payloadLaunchRaw && payloadLaunchRaw.value.trim()) {
       args.push(...splitArgs(payloadLaunchRaw.value));
     }
-    return args;
+    return { args, env };
   }
 
   async function confirmPayloadLaunch() {
     const path = payloadLaunchState.path;
     if (!path) return;
-    const args = buildPayloadArgsFromForm();
+    const built = buildPayloadArgsFromForm();
     closePayloadLaunch();
-    await startPayload(path, args);
+    await startPayload(path, built.args, built.env);
   }
 
-  async function startPayload(path, args = []) {
+  async function startPayload(path, args = [], env = {}) {
     setPayloadStatus("Starting...");
     try {
       const url = getApiUrl("/api/payloads/start");
       const res = await apiFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path, args }),
+        body: JSON.stringify({ path, args, env }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
@@ -2644,7 +2746,7 @@
       setPayloadStatus("Launched");
       loadPayloadLog();
     } catch (e) {
-      setPayloadStatus("Start failed");
+      setPayloadStatus(e && e.message ? e.message : "Start failed");
     }
   }
 
@@ -2700,6 +2802,7 @@
       if (!res.ok) throw new Error(data && data.error ? data.error : "log_failed");
       const text = String(data.text || "").trim();
       payloadLogTail.textContent = text || "No log output yet.";
+      payloadLogTail.scrollTop = payloadLogTail.scrollHeight;
       setPayloadLogStatus(data.exists ? "Live tail" : "No log yet");
     } catch (e) {
       payloadLogTail.textContent = "Unable to read payload log.";
@@ -2835,6 +2938,11 @@
       setActiveTab("network");
       loadNetworkStatus();
     });
+  if (navPayloads)
+    navPayloads.addEventListener("click", () => {
+      setActiveTab("payloads");
+      loadPayloads();
+    });
   if (navLoot)
     navLoot.addEventListener("click", () => {
       setActiveTab("loot");
@@ -2859,6 +2967,7 @@
       if (!tab) return;
       setActiveTab(tab);
       if (tab === "network") loadNetworkStatus();
+      if (tab === "payloads") loadPayloads();
       if (tab === "settings") {
         loadRuntimeConfig();
         loadUpdateStatus();
@@ -2915,8 +3024,8 @@
         const encodedId = catBtn.getAttribute("data-cat") || "";
         const id = decodeURIComponent(encodedId);
         if (id) {
-          payloadState.open[id] = !payloadState.open[id];
-          renderPayloadSidebar();
+          setActiveTab("payloads");
+          selectPayloadCategory(id);
         }
         return;
       }
@@ -2935,7 +3044,26 @@
   if (payloadsRefresh)
     payloadsRefresh.addEventListener("click", () => loadPayloads());
   if (payloadsRefreshMain)
-    payloadsRefreshMain.addEventListener("click", () => loadPayloads());
+    payloadsRefreshMain.addEventListener("click", () => {
+      setActiveTab("payloads");
+      loadPayloads();
+    });
+  if (payloadLibraryRefresh)
+    payloadLibraryRefresh.addEventListener("click", () => loadPayloads());
+  if (payloadLibraryStop)
+    payloadLibraryStop.addEventListener("click", () => stopPayload());
+  if (payloadSearch)
+    payloadSearch.addEventListener("input", () => {
+      payloadState.query = payloadSearch.value || "";
+      renderPayloadQuickGrid();
+    });
+  if (payloadCategoryList)
+    payloadCategoryList.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-payload-category]");
+      if (!btn) return;
+      const id = decodeURIComponent(btn.getAttribute("data-payload-category") || "");
+      selectPayloadCategory(id);
+    });
   if (payloadQuickGrid)
     payloadQuickGrid.addEventListener("click", (e) => {
       const startBtn = e.target.closest("[data-start]");
@@ -3109,6 +3237,9 @@
     payloadPollTimer = setTimeout(async () => {
       await pollPayloadStatus();
       await loadHeadlessStatus();
+      if (payloadState.activePath) {
+        await loadPayloadLog();
+      }
       schedulePayloadPoll();
     }, delay);
   }

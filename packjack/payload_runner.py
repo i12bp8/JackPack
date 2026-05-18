@@ -84,7 +84,7 @@ def status() -> dict[str, Any]:
     }
 
 
-def start(path: str, args: list[str] | None = None) -> dict[str, Any]:
+def start(path: str, args: list[str] | None = None, extra_env: dict[str, str] | None = None) -> dict[str, Any]:
     global _proc, _active_path, _started_at
     reap()
     if _proc is not None:
@@ -95,11 +95,17 @@ def start(path: str, args: list[str] | None = None) -> dict[str, Any]:
     env = os.environ.copy()
     env["RJ_HEADLESS"] = "1"
     env["RJ_PAYLOAD_MODE"] = "headless"
+    env.setdefault("RJ_FRAME_MIRROR", "0")
     env["PYTHONUNBUFFERED"] = "1"
     pythonpath = [str(ROOT_DIR), str(COMPAT_DIR)]
     if env.get("PYTHONPATH"):
         pythonpath.append(env["PYTHONPATH"])
     env["PYTHONPATH"] = os.pathsep.join(pythonpath)
+    if extra_env:
+        for key, value in extra_env.items():
+            if not key or not key.replace("_", "").isalnum():
+                continue
+            env[str(key)] = str(value)
 
     cmd = ["python3", str(target)]
     if args:

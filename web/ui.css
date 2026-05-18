@@ -471,6 +471,330 @@ a.ide-toolbar-btn {
   }
 }
 
+/* JackPack OLED control deck refresh */
+:root {
+  --jp-black: #000;
+  --jp-panel: #050712;
+  --jp-panel-2: #090d1a;
+  --jp-line: #20263a;
+  --jp-line-strong: #353d57;
+  --jp-text: #f7f8ff;
+  --jp-muted: #8b93a8;
+  --jp-green: #58ffb0;
+  --jp-purple: #b36bff;
+  --jp-danger: #ff4d79;
+}
+
+html,
+body {
+  background: #000 !important;
+  color: var(--jp-text) !important;
+}
+
+body::before,
+body::after {
+  display: none !important;
+}
+
+#sidebar {
+  background: #03050d !important;
+  border-color: var(--jp-line) !important;
+}
+
+main {
+  background: #000 !important;
+}
+
+.jp-hero,
+.jp-card,
+.jp-panel,
+.jp-hero-payload,
+#settingsTab > div,
+#lootTab > div,
+.terminal-wrap {
+  background: var(--jp-panel) !important;
+  border: 1px solid var(--jp-line) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.jp-hero {
+  border-radius: 18px;
+  padding: 1.15rem;
+}
+
+.jp-hero-compact h1 {
+  font-size: clamp(2rem, 4vw, 3.25rem);
+}
+
+.jp-card,
+.jp-panel,
+.jp-hero-payload {
+  border-radius: 12px;
+}
+
+.jp-panel-title,
+.jp-card-value,
+.jp-payload-name,
+.jp-network-ssid,
+.jp-category-title {
+  color: var(--jp-text) !important;
+}
+
+.jp-panel-title {
+  font-size: 0.95rem;
+}
+
+.jp-panel-subtitle,
+.jp-card-meta,
+.jp-payload-path,
+.jp-network-meta,
+.jp-category-meta {
+  color: var(--jp-muted) !important;
+}
+
+.jp-card-label,
+.jp-panel-title,
+.status-tone-ok,
+.jp-network-signal {
+  color: var(--jp-green) !important;
+  text-shadow: none !important;
+}
+
+.status-tone-warn {
+  color: #ffd166 !important;
+  text-shadow: none !important;
+}
+
+.status-tone-bad {
+  color: var(--jp-danger) !important;
+  text-shadow: none !important;
+}
+
+.jp-btn,
+#sidebar nav > button,
+#sidebar nav > a {
+  border-radius: 10px !important;
+  background: #0a0f1f !important;
+  border-color: var(--jp-line) !important;
+  color: #d9dded !important;
+  box-shadow: none !important;
+}
+
+.jp-btn:hover,
+#sidebar nav > button:hover,
+#sidebar nav > a:hover {
+  background: #11172a !important;
+  border-color: var(--jp-line-strong) !important;
+  color: #fff !important;
+}
+
+.jp-btn-primary,
+.jp-mobile-tabbar .jp-mobile-active,
+#sidebar nav > .nav-active {
+  background: rgba(88, 255, 176, 0.12) !important;
+  border-color: rgba(88, 255, 176, 0.46) !important;
+  color: var(--jp-green) !important;
+}
+
+.jp-btn-danger {
+  background: rgba(255, 77, 121, 0.12) !important;
+  border-color: rgba(255, 77, 121, 0.42) !important;
+  color: #ffd5df !important;
+}
+
+#sidebar nav > .nav-active::before {
+  background: var(--jp-green) !important;
+  box-shadow: 0 0 18px rgba(88, 255, 176, 0.55) !important;
+}
+
+input,
+textarea,
+select,
+.jp-field input,
+.jp-field select {
+  background: #070b16 !important;
+  border-color: var(--jp-line) !important;
+  color: var(--jp-text) !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: rgba(179, 107, 255, 0.7) !important;
+  box-shadow: 0 0 0 1px rgba(179, 107, 255, 0.45) !important;
+}
+
+.jp-category-list {
+  display: grid;
+  gap: 0.55rem;
+  max-height: 62vh;
+  overflow: auto;
+  padding-right: 0.15rem;
+}
+
+.jp-category-card {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--jp-line);
+  background: #070b16;
+  border-radius: 12px;
+  padding: 0.85rem;
+}
+
+.jp-category-card:hover,
+.jp-category-active {
+  border-color: rgba(179, 107, 255, 0.55);
+  background: rgba(179, 107, 255, 0.1);
+}
+
+.jp-category-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.jp-category-title {
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
+.jp-category-count {
+  color: var(--jp-green);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.jp-category-meta {
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+}
+
+.jp-payload-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.jp-payload-card {
+  min-height: 0;
+  border-radius: 12px;
+  border-color: var(--jp-line);
+  background: #070b16;
+  padding: 0.8rem;
+}
+
+.jp-payload-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.jp-payload-desc {
+  margin-top: 0.35rem;
+  color: var(--jp-muted);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.jp-tag {
+  background: #040711;
+  border-color: var(--jp-line);
+  color: #c7cde0;
+}
+
+.jp-tag-purple {
+  border-color: rgba(179, 107, 255, 0.5);
+  color: #ddbfff;
+}
+
+.jp-log {
+  background: #01030a !important;
+  border-color: var(--jp-line) !important;
+  color: #d9ffe9 !important;
+  min-height: 16rem;
+}
+
+.jp-network-list {
+  max-height: 18rem;
+}
+
+.jp-network-row,
+.jp-iface-row,
+.jp-check-row,
+.jp-diag-row {
+  background: #070b16 !important;
+  border-color: var(--jp-line) !important;
+}
+
+.jp-network-row:hover,
+.jp-network-selected {
+  border-color: rgba(88, 255, 176, 0.52) !important;
+  background: rgba(88, 255, 176, 0.1) !important;
+}
+
+.terminal-wrap .terminal-body {
+  display: none;
+  height: 52vh;
+  min-height: 18rem;
+}
+
+.terminal-wrap.shell-open .terminal-body {
+  display: block;
+}
+
+.jp-console-panel {
+  margin-top: 1rem;
+}
+
+@media (max-width: 768px) {
+  .jp-mobile-tabbar {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    border-radius: 14px;
+  }
+
+  .jp-mobile-tabbar button {
+    min-height: 2.75rem;
+    font-size: 0.58rem;
+  }
+
+  .jp-hero {
+    padding: 0.9rem;
+  }
+
+  .jp-hero h1 {
+    font-size: 2.15rem;
+  }
+
+  .jp-category-list {
+    display: flex;
+    overflow-x: auto;
+    max-height: none;
+    padding-bottom: 0.25rem;
+  }
+
+  .jp-category-card {
+    min-width: 13rem;
+  }
+
+  .jp-payload-row {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .jp-payload-row .jp-btn {
+    width: 100%;
+  }
+
+  .jp-network-list {
+    max-height: 34vh;
+  }
+}
+
 /* Shared nav sizing */
 #sidebar nav > button,
 #sidebar nav > a {
@@ -862,4 +1186,37 @@ main > .flex.items-center.justify-between.mb-4.md\:mb-6 {
   #lootList {
     max-height: min(52vh, 26rem);
   }
+}
+
+/* Final OLED overrides win over older look-match rules. */
+body {
+  background: #000 !important;
+}
+
+#sidebar,
+header,
+main > .flex.items-center.justify-between.mb-4.md\:mb-6,
+#deviceTab .terminal-wrap > .flex.items-center.justify-between,
+#settingsTab .flex.items-center.justify-between,
+#lootTab .flex.items-center.justify-between {
+  background: #03050d !important;
+  box-shadow: none !important;
+}
+
+#sidebar nav > button,
+#sidebar nav > a,
+.jp-btn {
+  background: #0a0f1f !important;
+}
+
+#lootList {
+  background: #050712 !important;
+  scrollbar-color: rgba(88, 255, 176, 0.7) #050712;
+}
+
+#lootList::-webkit-scrollbar-track,
+#lootList::-webkit-scrollbar-thumb,
+#lootList::-webkit-scrollbar-thumb:hover {
+  background: #11172a;
+  box-shadow: none;
 }

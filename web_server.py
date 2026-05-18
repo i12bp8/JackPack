@@ -80,7 +80,9 @@ PACKJACK_ENV_FALLBACK_PATH = ROOT_DIR / ".packjack.env"
 UPDATE_STATUS_PATH = Path(os.environ.get("JACKPACK_UPDATE_STATUS_PATH", "/dev/shm/jackpack_update_status.json"))
 
 _UPDATE_LOCK = threading.Lock()
+_PAYLOAD_LIST_CACHE: dict[str, object] = {"ts": 0.0, "payload": None}
 _IFACE_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,32}$")
+_MAC_RE = re.compile(r"^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
 _HOSTNAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 _ALLOWED_RUNTIME_CONFIG = {
     "JACKPACK_AP_IFACE",
@@ -95,6 +97,26 @@ _ALLOWED_RUNTIME_CONFIG = {
     "RJ_WS_PORT",
 }
 _SENSITIVE_RUNTIME_CONFIG = {"JACKPACK_AP_PASSWORD"}
+_CATEGORY_INFO = {
+    "reconnaissance": ("Reconnaissance", "Discover hosts, services, cameras, wireless clients, and useful network context."),
+    "wifi": ("WiFi", "Wireless assessment workflows for the external USB adapter."),
+    "network": ("Network", "Layer 2/3 network tools for the Pi 5 Ethernet port and connected target networks."),
+    "credentials": ("Credentials", "Credential audit helpers for authorized lab and red-team engagements."),
+    "exfiltration": ("Exfiltration", "Controlled data movement simulations and alerting tests."),
+    "remote_access": ("Remote Access", "Operator tunnels, pivots, and callback utilities for owned systems."),
+    "evasion": ("Evasion", "Defensive validation and stealth-behavior simulations."),
+    "bluetooth": ("Bluetooth", "BLE and classic Bluetooth discovery and testing."),
+    "nfc_rfid": ("NFC/RFID", "NFC and RFID reader, writer, and research workflows."),
+    "sdr": ("SDR", "Software-defined radio receivers and RF analysis utilities."),
+    "usb": ("USB", "USB HID, storage, and device-behavior tests."),
+    "hardware": ("Hardware", "GPS, GPIO, LTE, and local hardware support tools."),
+    "utilities": ("Utilities", "Maintenance, diagnostics, setup helpers, and everyday field tools."),
+    "games": ("Games", "LCD-era games kept for compatibility testing and downtime."),
+    "examples": ("Examples", "Payload templates and reference implementations."),
+    "ai": ("AI", "Local model demos and sensor-assisted experiments."),
+    "payloads": ("Payloads", "Imported or uncategorized payload scripts."),
+    "general": ("General", "General-purpose payload scripts."),
+}
 
 
 def _load_shared_token() -> str | None:
@@ -816,7 +838,31 @@ def _wifi_scan(iface: str) -> tuple[bool, dict]:
     return True, {"ok": True, "iface": iface, "networks": networks}
 
 
-def _connect_wifi(iface: str, ssid: str, password: str, hidden: bool, force_control_iface: bool) -> tuple[bool, dict]:
+def _wifi_profile_name(iface: str, ssid: str) -> str:
+    safe_ssid = re.sub(r"[^A-Za-z0-9_.-]+", "-", ssid).strip("-")[:28] or "network"
+    return f"jackpack-uplink-{iface}-{safe_ssid}"
+
+
+def _security_key_mgmt(security: str, password: str) -> str:
+    text = str(security or "").upper()
+    if not password:
+        return ""
+    if ("SAE" in text or "WPA3" in text) and "WPA2" not in text and "WPA" not in text.replace("WPA3", ""):
+        return "sae"
+    if "WEP" in text:
+        return "none"
+    return "wpa-psk"
+
+
+def _connect_wifi(
+    iface: str,
+    ssid: str,
+    password: str,
+    hidden: bool,
+    force_control_iface: bool,
+    security: str = "",
+    bssid: str = "",
+) -> tuple[bool, dict]:
     if not _valid_iface_name(iface):
         return False, {"error": "invalid interface"}
     ssid = str(ssid or "").strip()
@@ -833,15 +879,65 @@ def _connect_wifi(iface: str, ssid: str, password: str, hidden: bool, force_cont
         }
     if _which("nmcli") is None:
         return False, {"error": "nmcli is not installed"}
-    args = ["nmcli", "device", "wifi", "connect", ssid, "ifname", iface]
-    if password:
-        args.extend(["password", password])
+    profile = _wifi_profile_name(iface, ssid)
+    _run_command(["nmcli", "connection", "delete", profile], timeout=10)
+    code, stdout, stderr = _run_command(
+        [
+            "nmcli",
+            "connection",
+            "add",
+            "type",
+            "wifi",
+            "ifname",
+            iface,
+            "con-name",
+            profile,
+            "ssid",
+            ssid,
+        ],
+        timeout=15,
+    )
+    if code != 0:
+        return False, {"error": (stderr or stdout or "profile creation failed").strip()}
+
+    modify_args = [
+        "nmcli",
+        "connection",
+        "modify",
+        profile,
+        "connection.interface-name",
+        iface,
+        "connection.autoconnect",
+        "yes",
+        "802-11-wireless.mode",
+        "infrastructure",
+        "802-11-wireless.ssid",
+        ssid,
+        "ipv4.method",
+        "auto",
+        "ipv6.method",
+        "ignore",
+    ]
     if hidden:
-        args.extend(["hidden", "yes"])
-    code, stdout, stderr = _run_command(args, timeout=35)
+        modify_args.extend(["802-11-wireless.hidden", "yes"])
+    if bssid and _MAC_RE.match(bssid):
+        modify_args.extend(["802-11-wireless.bssid", bssid])
+    key_mgmt = _security_key_mgmt(security, password)
+    if key_mgmt:
+        modify_args.extend(["802-11-wireless-security.key-mgmt", key_mgmt])
+        if key_mgmt == "none":
+            modify_args.extend(["802-11-wireless-security.wep-key0", password])
+        else:
+            modify_args.extend(["802-11-wireless-security.psk", password])
+
+    code, stdout, stderr = _run_command(modify_args, timeout=15)
+    if code != 0:
+        return False, {"error": (stderr or stdout or "profile configuration failed").strip()}
+
+    code, stdout, stderr = _run_command(["nmcli", "connection", "up", profile, "ifname", iface], timeout=35)
     if code != 0:
         return False, {"error": (stderr or stdout or "connect failed").strip()}
-    return True, {"ok": True, "message": stdout.strip(), "status": _network_status()}
+    return True, {"ok": True, "message": stdout.strip(), "profile": profile, "status": _network_status()}
 
 
 def _disconnect_iface(iface: str, force_control_iface: bool) -> tuple[bool, dict]:
@@ -922,11 +1018,20 @@ def _payload_meta(path: Path) -> dict:
         "uses_wifi": False,
         "uses_external_wifi": False,
         "tags": [],
+        "description": "",
     }
     try:
         text = path.read_text(encoding="utf-8", errors="ignore")
     except Exception:
         return meta
+
+    try:
+        tree = ast.parse(text)
+        doc = ast.get_docstring(tree) or ""
+        first = next((line.strip() for line in doc.splitlines() if line.strip()), "")
+        meta["description"] = first[:180]
+    except Exception:
+        pass
 
     display_markers = ("LCD_", "LCD.", "ImageDraw", "ScaledDraw", "_display_helper")
     input_markers = ("get_button", "KEY3", "KEY_PRESS", "_input_helper")
@@ -1029,6 +1134,61 @@ def _module_literal_env(tree: ast.AST) -> dict[str, object]:
     return env
 
 
+def _infer_headless_fields(tree: ast.AST, meta: dict) -> list[dict]:
+    fields: list[dict] = []
+    has_selected_iface = False
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not (isinstance(func, ast.Name) and func.id == "select_interface"):
+            continue
+        iface_type = "any"
+        require_monitor = False
+        for keyword in node.keywords:
+            value = _ast_eval_static(keyword.value, {})
+            if keyword.arg == "iface_type" and isinstance(value, str):
+                iface_type = value
+            elif keyword.arg == "require_monitor":
+                require_monitor = bool(value)
+        if len(node.args) >= 5:
+            value = _ast_eval_static(node.args[4], {})
+            if isinstance(value, str):
+                iface_type = value
+        if not has_selected_iface:
+            default = _env_first(
+                "JACKPACK_ATTACK_IFACE",
+                "PACKJACK_ATTACK_IFACE",
+                default="wlan1",
+            )
+            if iface_type in {"eth", "wired"}:
+                default = _env_first("JACKPACK_WIRED_IFACE", "PACKJACK_WIRED_IFACE", default="eth0")
+            fields.append({
+                "name": "selected_iface",
+                "env": "JACKPACK_SELECTED_IFACE",
+                "label": "Payload Interface",
+                "type": "interface",
+                "required": True,
+                "default": default,
+                "help": "Used by JackPack's headless interface picker.",
+                "iface_type": iface_type,
+                "require_monitor": require_monitor,
+            })
+            has_selected_iface = True
+    if meta.get("uses_wifi") and not has_selected_iface:
+        fields.append({
+            "name": "attack_iface",
+            "env": "JACKPACK_ATTACK_IFACE",
+            "label": "Attack WiFi",
+            "type": "interface",
+            "required": False,
+            "default": _env_first("JACKPACK_ATTACK_IFACE", "PACKJACK_ATTACK_IFACE", default="wlan1"),
+            "help": "External USB WiFi used by WiFi payloads.",
+            "iface_type": "wifi",
+        })
+    return fields
+
+
 def _payload_form_schema(path: Path) -> dict:
     meta = _payload_meta(path)
     schema = {
@@ -1120,6 +1280,11 @@ def _payload_form_schema(path: Path) -> dict:
         if lower_name in {"port", "lport", "rport"} or lower_name.endswith("_port"):
             field["type"] = "number"
         fields.append(field)
+
+    for inferred in _infer_headless_fields(tree, meta):
+        key = inferred.get("env") or inferred.get("arg") or inferred.get("name")
+        if key and not any((field.get("env") or field.get("arg") or field.get("name")) == key for field in fields):
+            fields.insert(0, inferred)
 
     if fields:
         schema.update({
@@ -2067,6 +2232,10 @@ class JackPackHandler(SimpleHTTPRequestHandler):
         })
 
     def _handle_payloads_list(self) -> None:
+        cached = _PAYLOAD_LIST_CACHE.get("payload")
+        if cached and (time.time() - float(_PAYLOAD_LIST_CACHE.get("ts") or 0)) < 5:
+            _json_response(self, cached)
+            return
         categories: dict[str, list[dict]] = {}
         if not PAYLOADS_DIR.exists():
             _json_response(self, {"categories": []})
@@ -2089,17 +2258,23 @@ class JackPackHandler(SimpleHTTPRequestHandler):
 
         order = [
             "reconnaissance",
-            "interception",
-            "evil_portal",
+            "wifi",
+            "network",
+            "credentials",
             "exfiltration",
             "remote_access",
-            "general",
-            "examples",
+            "evasion",
+            "bluetooth",
+            "nfc_rfid",
+            "sdr",
+            "usb",
+            "hardware",
+            "utilities",
+            "ai",
             "games",
-            "virtual_pager",
-            "incident_response",
-            "known_unstable",
-            "prank",
+            "examples",
+            "payloads",
+            "general",
         ]
 
         payload_categories = []
@@ -2107,22 +2282,29 @@ class JackPackHandler(SimpleHTTPRequestHandler):
             items = categories.get(cat, [])
             if not items:
                 continue
+            label, description = _CATEGORY_INFO.get(cat, (cat.replace("_", " ").title(), ""))
             payload_categories.append({
                 "id": cat,
-                "label": cat.replace("_", " ").title(),
+                "label": label,
+                "description": description,
                 "items": sorted(items, key=lambda x: x["name"].lower()),
             })
 
         for cat in sorted(categories.keys()):
             if cat in order:
                 continue
+            label, description = _CATEGORY_INFO.get(cat, (cat.replace("_", " ").title(), ""))
             payload_categories.append({
                 "id": cat,
-                "label": cat.replace("_", " ").title(),
+                "label": label,
+                "description": description,
                 "items": sorted(categories[cat], key=lambda x: x["name"].lower()),
             })
 
-        _json_response(self, {"categories": payload_categories})
+        payload = {"categories": payload_categories}
+        _PAYLOAD_LIST_CACHE["payload"] = payload
+        _PAYLOAD_LIST_CACHE["ts"] = time.time()
+        _json_response(self, payload)
 
     def _handle_payloads_schema(self, query: dict) -> None:
         raw = query.get("path", [""])[0]
@@ -2163,8 +2345,14 @@ class JackPackHandler(SimpleHTTPRequestHandler):
         if HEADLESS_MODE and payload_runner is not None:
             raw_args = body.get("args")
             args = raw_args if isinstance(raw_args, list) else None
+            raw_env = body.get("env")
+            extra_env = {
+                str(key): str(value)
+                for key, value in (raw_env.items() if isinstance(raw_env, dict) else [])
+                if re.match(r"^[A-Z0-9_]{1,64}$", str(key))
+            }
             try:
-                status = payload_runner.start(rel_path, args)
+                status = payload_runner.start(rel_path, args, extra_env=extra_env)
                 _json_response(self, {"ok": True, **status})
             except payload_runner.PayloadError as exc:
                 _json_response(self, {"error": str(exc)}, status=HTTPStatus.CONFLICT)
@@ -2266,6 +2454,8 @@ class JackPackHandler(SimpleHTTPRequestHandler):
             str(body.get("password", "")),
             bool(body.get("hidden")),
             bool(body.get("force_control_iface")),
+            str(body.get("security", "")).strip(),
+            str(body.get("bssid", "")).strip(),
         )
         _json_response(self, payload, status=HTTPStatus.OK if ok else HTTPStatus.CONFLICT)
 
@@ -2609,8 +2799,18 @@ class JackPackHandler(SimpleHTTPRequestHandler):
             self.end_headers()
 
     def _handle_wardriving_start(self) -> None:
-        """Start wardriving payload via the payload request mechanism."""
+        """Start wardriving in headless auto mode."""
         try:
+            if HEADLESS_MODE and payload_runner is not None:
+                try:
+                    status = payload_runner.start("reconnaissance/wardriving.py", ["--auto"])
+                    _json_response(self, {"ok": True, **status})
+                except payload_runner.PayloadError as exc:
+                    if "already running" in str(exc):
+                        _json_response(self, {"ok": True, "status": "already_running", **payload_runner.status()})
+                    else:
+                        _json_response(self, {"error": str(exc)}, status=HTTPStatus.CONFLICT)
+                return
             if PAYLOAD_STATE_PATH.exists():
                 raw = PAYLOAD_STATE_PATH.read_text(encoding="utf-8")
                 pdata = json.loads(raw) if raw else {}
@@ -2628,8 +2828,11 @@ class JackPackHandler(SimpleHTTPRequestHandler):
             _json_response(self, {"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
     def _handle_wardriving_stop(self) -> None:
-        """Stop the currently running payload by sending KEY3 via rj_input socket."""
+        """Stop the currently running wardriving payload."""
         try:
+            if HEADLESS_MODE and payload_runner is not None:
+                _json_response(self, {"ok": True, **payload_runner.stop()})
+                return
             sock_path = "/dev/shm/rj_input.sock"
             if not os.path.exists(sock_path):
                 _json_response(self, {"ok": False, "error": "input socket not found"})

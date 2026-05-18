@@ -269,6 +269,15 @@ def select_interface(lcd, font, pins, gpio, iface_type="any", title=None,
     if require_monitor:
         ifaces = [i for i in ifaces if i.get("supports_monitor")]
 
+    if os.environ.get("RJ_HEADLESS") == "1":
+        selected = os.environ.get("JACKPACK_SELECTED_IFACE", "").strip()
+        if selected and any(i["name"] == selected for i in ifaces):
+            return selected
+        default = get_default_interface(iface_type)
+        if default and any(i["name"] == default for i in ifaces):
+            return default
+        return ifaces[0]["name"] if ifaces else None
+
     if not ifaces:
         if require_monitor:
             _show_message(lcd, font, "No monitor iface!", "#FF4444")
