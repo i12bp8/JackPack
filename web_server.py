@@ -1147,6 +1147,7 @@ _DEFAULT_PAYLOAD_ACTIONS = [
 
 
 _ACTION_BUTTONS = {"UP", "DOWN", "LEFT", "RIGHT", "OK", "KEY1", "KEY2", "KEY3"}
+_ACTION_ALIASES = {"DN": "DOWN"}
 
 
 def _normalize_action(item: object) -> dict | None:
@@ -1169,26 +1170,58 @@ def _normalize_action(item: object) -> dict | None:
 def _actions_from_controls_text(source: str) -> list[dict]:
     actions: list[dict] = []
     seen: set[str] = set()
+
+    def add(button: str, description: str) -> None:
+        button = _ACTION_ALIASES.get(button.upper(), button.upper())
+        if button not in _ACTION_BUTTONS or button in seen:
+            return
+        clean = re.sub(r"\s+", " ", description.strip().strip(".")).strip()
+        if not clean:
+            return
+        seen.add(button)
+        label = clean.split(";", 1)[0].split(",", 1)[0].strip()[:28] or button
+        actions.append({
+            "button": button,
+            "label": label,
+            "description": clean[:120],
+            "group": "navigation" if button in {"UP", "DOWN", "LEFT", "RIGHT", "OK"} else "actions",
+        })
+
     for raw in source.splitlines():
         line = raw.strip().strip("#").strip()
-        match = re.match(r"^(UP|DOWN|LEFT|RIGHT|OK|KEY[123])(?:\s*/\s*(UP|DOWN|LEFT|RIGHT|OK|KEY[123]))?\s*(?:[-:=]+|--|—)\s*(.+)$", line, re.I)
-        if not match:
-            continue
-        buttons = [match.group(1).upper()]
-        if match.group(2):
-            buttons.append(match.group(2).upper())
-        description = match.group(3).strip()
-        for button in buttons:
-            if button in seen:
+        match = re.match(r"^(UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123])(?:\s*/\s*(UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123]))?\s*(?:[-:=]+|--|—)\s*(.+)$", line, re.I)
+        if match:
+            description = match.group(3)
+            has_more_actions = re.search(
+                r"\b(UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123])\b\s*(?::|=|--|—|\s{2,})",
+                description,
+                re.I,
+            )
+            if not has_more_actions:
+                buttons = [match.group(1).upper()]
+                if match.group(2):
+                    buttons.append(match.group(2).upper())
+                for button in buttons:
+                    add(button, description)
                 continue
-            seen.add(button)
-            label = description.split(";", 1)[0].split(",", 1)[0].strip()[:28] or button
-            actions.append({
-                "button": button,
-                "label": label,
-                "description": description[:120],
-                "group": "navigation" if button in {"UP", "DOWN", "LEFT", "RIGHT", "OK"} else "actions",
-            })
+
+        # Catch compact docs and embedded LCD labels, e.g.
+        # "Controls: OK=start, KEY1=toggle mode" or "KEY1  Scan subnet".
+        compact = line
+        if "controls:" in compact.lower():
+            compact = compact.split(":", 1)[1]
+        for match in re.finditer(
+            r"\b(UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123])\b"
+            r"(?:\s*/\s*(UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123]))?"
+            r"\s*(?::|=|--|—|\s{2,})\s*"
+            r"([^\"'`,;|]{2,70}?)(?=\s+\b(?:UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123])\b\s*(?::|=|--|—|\s{2,})|[,;|]|$)",
+            compact,
+            re.I,
+        ):
+            desc = match.group(3)
+            add(match.group(1), desc)
+            if match.group(2):
+                add(match.group(2), desc)
     return actions
 
 

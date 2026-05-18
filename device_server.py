@@ -64,6 +64,14 @@ else:
     WEBUI_INTERFACES = [_wired, _ap, "tailscale0"]
 
 
+def _setup_shell_child() -> None:
+    os.setsid()
+    try:
+        fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+    except Exception:
+        pass
+
+
 def _load_shared_token():
     """Load auth token from env first, then token file."""
     env_token = str(os.environ.get("RJ_WS_TOKEN", "")).strip()
@@ -286,9 +294,12 @@ class ShellSession:
             cwd=SHELL_CWD,
             env=env,
             close_fds=True,
+            preexec_fn=_setup_shell_child,
         )
         os.close(self.slave_fd)
         os.set_blocking(self.master_fd, False)
+        self._pending_output = bytearray()
+        self._flush_handle = None
         self.loop.add_reader(self.master_fd, self._on_output)
         self._closed = False
         self._exit_sent = False
@@ -305,14 +316,32 @@ class ShellSession:
         if self._closed:
             return
         try:
-            data = os.read(self.master_fd, 4096)
-            if not data:
-                self.loop.create_task(self._send_exit())
-                return
-            msg = json.dumps({"type": "shell_out", "data": data.decode("utf-8", "ignore")})
-            self.loop.create_task(self._safe_send(msg))
+            while True:
+                try:
+                    data = os.read(self.master_fd, 65536)
+                except BlockingIOError:
+                    break
+                if not data:
+                    self.loop.create_task(self._send_exit())
+                    return
+                self._pending_output.extend(data)
+                if len(self._pending_output) >= 131072:
+                    break
+            if self._pending_output and self._flush_handle is None:
+                self._flush_handle = self.loop.call_later(0.01, self._flush_output)
+        except OSError:
+            self.loop.create_task(self._send_exit())
         except Exception:
             self.loop.create_task(self._send_exit())
+
+    def _flush_output(self):
+        self._flush_handle = None
+        if self._closed or not self._pending_output:
+            return
+        data = bytes(self._pending_output)
+        self._pending_output.clear()
+        msg = json.dumps({"type": "shell_out", "data": data.decode("utf-8", "ignore")})
+        self.loop.create_task(self._safe_send(msg))
 
     async def _safe_send(self, msg: str):
         try:
@@ -356,6 +385,12 @@ class ShellSession:
         if self._closed:
             return
         self._closed = True
+        if self._flush_handle is not None:
+            try:
+                self._flush_handle.cancel()
+            except Exception:
+                pass
+            self._flush_handle = None
         try:
             self.loop.remove_reader(self.master_fd)
         except Exception:

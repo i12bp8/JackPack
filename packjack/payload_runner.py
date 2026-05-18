@@ -19,6 +19,7 @@ STATE_PATH = Path(os.environ.get("RJ_PAYLOAD_STATE_PATH", "/dev/shm/rj_payload_s
 _proc: subprocess.Popen[bytes] | None = None
 _active_path: str | None = None
 _started_at: float | None = None
+_run_id: str | None = None
 
 
 class PayloadError(RuntimeError):
@@ -32,6 +33,8 @@ def _write_state(running: bool, path: str | None = None, **extra: Any) -> None:
         "pid": _proc.pid if running and _proc else None,
         "mode": "headless",
         "started_at": _started_at if running else None,
+        "run_id": _run_id if running else None,
+        "log_path": str(PAYLOAD_LOG.relative_to(ROOT_DIR)),
         "ts": time.time(),
         **extra,
     }
@@ -56,7 +59,7 @@ def _safe_payload_path(raw_path: str) -> tuple[str, Path]:
 
 
 def reap() -> None:
-    global _proc, _active_path, _started_at
+    global _proc, _active_path, _started_at, _run_id
     if _proc is None:
         _write_state(False, None)
         return
@@ -64,10 +67,11 @@ def reap() -> None:
     if rc is None:
         _write_state(True, _active_path, returncode=None)
         return
-    _write_state(False, None, last_path=_active_path, returncode=rc, finished_at=time.time())
+    _write_state(False, None, last_path=_active_path, last_run_id=_run_id, returncode=rc, finished_at=time.time())
     _proc = None
     _active_path = None
     _started_at = None
+    _run_id = None
 
 
 def status() -> dict[str, Any]:
@@ -80,12 +84,14 @@ def status() -> dict[str, Any]:
         "pid": _proc.pid,
         "mode": "headless",
         "started_at": _started_at,
+        "run_id": _run_id,
+        "log_path": str(PAYLOAD_LOG.relative_to(ROOT_DIR)),
         "ts": time.time(),
     }
 
 
 def start(path: str, args: list[str] | None = None, extra_env: dict[str, str] | None = None) -> dict[str, Any]:
-    global _proc, _active_path, _started_at
+    global _proc, _active_path, _started_at, _run_id
     reap()
     if _proc is not None:
         raise PayloadError(f"payload already running: {_active_path}")
@@ -111,9 +117,18 @@ def start(path: str, args: list[str] | None = None, extra_env: dict[str, str] | 
     if args:
         cmd.extend(str(arg) for arg in args)
 
-    log = PAYLOAD_LOG.open("ab", buffering=0)
     _started_at = time.time()
     _active_path = rel_path
+    _run_id = f"{int(_started_at)}-{os.getpid()}"
+    header = (
+        f"JackPack payload run {_run_id}\n"
+        f"payload: {rel_path}\n"
+        f"cwd: {ROOT_DIR}\n"
+        f"command: {' '.join(cmd)}\n"
+        "\n"
+    )
+    PAYLOAD_LOG.write_text(header, encoding="utf-8")
+    log = PAYLOAD_LOG.open("ab", buffering=0)
     try:
         _proc = subprocess.Popen(
             cmd,
@@ -127,6 +142,7 @@ def start(path: str, args: list[str] | None = None, extra_env: dict[str, str] | 
     except Exception:
         _active_path = None
         _started_at = None
+        _run_id = None
         log.close()
         raise
     _write_state(True, rel_path, returncode=None)
@@ -141,7 +157,7 @@ def stop(timeout: float = 8.0) -> dict[str, Any]:
 
     proc = _proc
     try:
-        os.killpg(proc.pid, signal.SIGINT)
+        os.killpg(proc.pid, signal.SIGTERM)
     except Exception:
         try:
             proc.terminate()
@@ -152,7 +168,7 @@ def stop(timeout: float = 8.0) -> dict[str, Any]:
         time.sleep(0.1)
     if proc.poll() is None:
         try:
-            os.killpg(proc.pid, signal.SIGTERM)
+            os.killpg(proc.pid, signal.SIGINT)
         except Exception:
             proc.terminate()
     deadline = time.monotonic() + 3.0

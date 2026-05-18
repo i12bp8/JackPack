@@ -23,6 +23,7 @@
   const navSystem = document.getElementById("navSystem");
   const navNetwork = document.getElementById("navNetwork");
   const navPayloads = document.getElementById("navPayloads");
+  const navTerminal = document.getElementById("navTerminal");
   const navLoot = document.getElementById("navLoot");
   const navSettings = document.getElementById("navSettings");
   const navPayloadStudio = document.getElementById("navPayloadStudio");
@@ -31,6 +32,7 @@
   const menuToggle = document.getElementById("menuToggle");
   const deviceTab = document.getElementById("deviceTab");
   const payloadTab = document.getElementById("payloadTab");
+  const terminalTab = document.getElementById("terminalTab");
   const networkTab = document.getElementById("networkTab");
   const systemDropdown = document.getElementById("systemDropdown");
   const settingsTab = document.getElementById("settingsTab");
@@ -82,6 +84,11 @@
   const payloadLibraryActive = document.getElementById("payloadLibraryActive");
   const payloadLibraryStop = document.getElementById("payloadLibraryStop");
   const payloadLibraryRefresh = document.getElementById("payloadLibraryRefresh");
+  const payloadWorkbenchStop = document.getElementById("payloadWorkbenchStop");
+  const payloadWorkbenchMeta = document.getElementById("payloadWorkbenchMeta");
+  const payloadWorkbenchLogTail = document.getElementById("payloadWorkbenchLogTail");
+  const payloadWorkbenchLogStatus = document.getElementById("payloadWorkbenchLogStatus");
+  const payloadWorkbenchLogRefresh = document.getElementById("payloadWorkbenchLogRefresh");
   const payloadActionGrid = document.getElementById("payloadActionGrid");
   const payloadControlStatus = document.getElementById("payloadControlStatus");
   const payloadSummary = document.getElementById("payloadSummary");
@@ -635,6 +642,7 @@
   let shellOpen = false;
   let terminalHasFocus = false;
   let shellWanted = false;
+  let pendingShellCommands = [];
   let systemOpen = false;
   let wsAuthenticated = true;
 
@@ -690,6 +698,10 @@
       payloadLogStatus.textContent = txt;
       applyStatusTone(payloadLogStatus, txt);
     }
+    if (payloadWorkbenchLogStatus) {
+      payloadWorkbenchLogStatus.textContent = txt;
+      applyStatusTone(payloadWorkbenchLogStatus, txt);
+    }
   }
 
   function payloadLabel(path) {
@@ -716,11 +728,23 @@
         activePayloadMeta.textContent = path || "running";
       }
     }
+    if (payloadWorkbenchMeta) {
+      if (!running) {
+        payloadWorkbenchMeta.textContent = "Ready";
+      } else if (status.started_at) {
+        payloadWorkbenchMeta.textContent = `${path} · ${formatDuration(Date.now() / 1000 - Number(status.started_at || 0))}`;
+      } else {
+        payloadWorkbenchMeta.textContent = path || "running";
+      }
+    }
     if (activePayloadStop) {
       activePayloadStop.classList.toggle("hidden", !running);
     }
     if (payloadLibraryStop) {
       payloadLibraryStop.classList.toggle("hidden", !running);
+    }
+    if (payloadWorkbenchStop) {
+      payloadWorkbenchStop.classList.toggle("hidden", !running);
     }
     renderPayloadActions();
   }
@@ -893,18 +917,29 @@
     const isDevice = tab === "device";
     if (deviceTab) deviceTab.classList.toggle("hidden", !isDevice);
     if (payloadTab) payloadTab.classList.toggle("hidden", tab !== "payloads");
+    if (terminalTab) terminalTab.classList.toggle("hidden", tab !== "terminal");
     if (networkTab) networkTab.classList.toggle("hidden", tab !== "network");
     if (settingsTab) settingsTab.classList.toggle("hidden", tab !== "settings");
     if (lootTab) lootTab.classList.toggle("hidden", tab !== "loot");
     setNavActive(navDevice, isDevice);
     setNavActive(navNetwork, tab === "network");
     setNavActive(navPayloads, tab === "payloads");
+    setNavActive(navTerminal, tab === "terminal");
     setNavActive(navLoot, tab === "loot");
     setNavActive(navSettings, tab === "settings");
     document.querySelectorAll("[data-mobile-tab]").forEach((btn) => {
       const active = btn.getAttribute("data-mobile-tab") === tab;
       btn.classList.toggle("jp-mobile-active", active);
     });
+    if (tab === "terminal") {
+      ensureTerminal();
+      window.requestAnimationFrame(() => {
+        sendShellResize();
+        try {
+          term && term.focus();
+        } catch {}
+      });
+    }
     setSidebarOpen(false);
   }
 
@@ -1030,6 +1065,7 @@
           terminalEl?.closest(".terminal-wrap")?.classList.add("shell-open");
           setShellStatus("Connected");
           sendShellResize();
+          flushPendingShellCommands();
           return;
         }
         if (msg.type === "shell_out" && msg.data) {
@@ -1081,11 +1117,15 @@
     if (!term) {
       term = new window.Terminal({
         cursorBlink: true,
-        fontSize: 13,
+        fontSize: 14,
+        scrollback: 5000,
+        convertEol: true,
+        fastScrollModifier: "alt",
         theme: {
-          background: "transparent",
-          foreground: "#e2e8f0",
-          cursor: "#94a3b8",
+          background: "#01030a",
+          foreground: "#f7f8ff",
+          cursor: "#58ffb0",
+          selectionBackground: "#b36bff66",
         },
       });
       if (window.FitAddon && window.FitAddon.FitAddon) {
@@ -1123,6 +1163,25 @@
     try {
       ws.send(JSON.stringify({ type: "shell_in", data }));
     } catch {}
+  }
+
+  function flushPendingShellCommands() {
+    if (!pendingShellCommands.length) return;
+    const queued = pendingShellCommands.splice(0);
+    setTimeout(() => {
+      queued.forEach((command) => sendShellInput(`${command}\n`));
+    }, 80);
+  }
+
+  function sendShellCommand(command) {
+    const clean = String(command || "").trim();
+    if (!clean) return;
+    if (!shellOpen) {
+      pendingShellCommands.push(clean);
+      sendShellOpen();
+      return;
+    }
+    sendShellInput(`${clean}\n`);
   }
 
   function sendShellOpen() {
@@ -2822,6 +2881,10 @@
 
   async function startPayload(path, args = [], env = {}) {
     setPayloadStatus("Starting...");
+    if (payloadLogTail) payloadLogTail.textContent = "Starting payload...";
+    if (payloadWorkbenchLogTail) payloadWorkbenchLogTail.textContent = "Starting payload...";
+    payloadState.activePath = path;
+    setActivePayloadView({ running: true, path, started_at: Date.now() / 1000 });
     try {
       const url = getApiUrl("/api/payloads/start");
       const res = await apiFetch(url, {
@@ -2834,6 +2897,7 @@
         throw new Error(data && data.error ? data.error : "start_failed");
       }
       payloadState.activePath = path;
+      setActivePayloadView(data);
       if (!payloadState.activeSchema || payloadState.activeSchema.path !== path) {
         await loadActivePayloadSchema(path);
       } else {
@@ -2844,6 +2908,9 @@
       setPayloadStatus("Launched");
       loadPayloadLog();
     } catch (e) {
+      payloadState.activePath = null;
+      setActivePayloadView({ running: false, path: null });
+      renderPayloadQuickGrid();
       setPayloadStatus(e && e.message ? e.message : "Start failed");
     }
   }
@@ -2859,6 +2926,7 @@
       }
       payloadState.activePath = null;
       payloadState.activeSchema = null;
+      setActivePayloadView({ running: false, path: null });
       renderPayloadSidebar();
       renderPayloadQuickGrid();
       renderPayloadActions();
@@ -2899,8 +2967,15 @@
     }
   }
 
-  async function loadPayloadLog() {
-    if (!payloadLogTail) return;
+  async function loadPayloadLog(force = false) {
+    if (!payloadLogTail && !payloadWorkbenchLogTail) return;
+    if (!force && !payloadState.activePath) {
+      const idleText = "No active payload. Start one from the Payloads page.";
+      if (payloadLogTail) payloadLogTail.textContent = idleText;
+      if (payloadWorkbenchLogTail) payloadWorkbenchLogTail.textContent = idleText;
+      setPayloadLogStatus("Idle");
+      return;
+    }
     setPayloadLogStatus("Loading...");
     try {
       const url = getApiUrl("/api/payloads/log", { bytes: "65536" });
@@ -2908,11 +2983,19 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data && data.error ? data.error : "log_failed");
       const text = String(data.text || "").trim();
-      payloadLogTail.textContent = text || "No log output yet.";
-      payloadLogTail.scrollTop = payloadLogTail.scrollHeight;
+      const display = text || "No log output yet.";
+      if (payloadLogTail) {
+        payloadLogTail.textContent = display;
+        payloadLogTail.scrollTop = payloadLogTail.scrollHeight;
+      }
+      if (payloadWorkbenchLogTail) {
+        payloadWorkbenchLogTail.textContent = display;
+        payloadWorkbenchLogTail.scrollTop = payloadWorkbenchLogTail.scrollHeight;
+      }
       setPayloadLogStatus(data.exists ? "Live tail" : "No log yet");
     } catch (e) {
-      payloadLogTail.textContent = "Unable to read payload log.";
+      if (payloadLogTail) payloadLogTail.textContent = "Unable to read payload log.";
+      if (payloadWorkbenchLogTail) payloadWorkbenchLogTail.textContent = "Unable to read payload log.";
       setPayloadLogStatus("Unavailable");
     }
   }
@@ -3097,6 +3180,12 @@
   if (shellConnectBtn) shellConnectBtn.addEventListener("click", sendShellOpen);
   if (shellDisconnectBtn)
     shellDisconnectBtn.addEventListener("click", sendShellClose);
+  document.querySelectorAll("[data-shell-command]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const command = btn.getAttribute("data-shell-command") || "";
+      sendShellCommand(command);
+    });
+  });
   if (logoutBtn) logoutBtn.addEventListener("click", logoutUser);
   window.addEventListener("resize", () => {
     if (shellOpen) sendShellResize();
@@ -3116,6 +3205,11 @@
     navPayloads.addEventListener("click", () => {
       setActiveTab("payloads");
       loadPayloads();
+    });
+  if (navTerminal)
+    navTerminal.addEventListener("click", () => {
+      setActiveTab("terminal");
+      sendShellOpen();
     });
   if (navLoot)
     navLoot.addEventListener("click", () => {
@@ -3142,6 +3236,7 @@
       setActiveTab(tab);
       if (tab === "network") loadNetworkStatus();
       if (tab === "payloads") loadPayloads();
+      if (tab === "terminal") sendShellOpen();
       if (tab === "settings") {
         loadRuntimeConfig();
         loadUpdateStatus();
@@ -3226,6 +3321,8 @@
     payloadLibraryRefresh.addEventListener("click", () => loadPayloads());
   if (payloadLibraryStop)
     payloadLibraryStop.addEventListener("click", () => stopPayload());
+  if (payloadWorkbenchStop)
+    payloadWorkbenchStop.addEventListener("click", () => stopPayload());
   if (payloadSearch)
     payloadSearch.addEventListener("input", () => {
       payloadState.query = payloadSearch.value || "";
@@ -3258,7 +3355,9 @@
       if (button) tapInput(button);
     });
   if (payloadLogRefresh)
-    payloadLogRefresh.addEventListener("click", () => loadPayloadLog());
+    payloadLogRefresh.addEventListener("click", () => loadPayloadLog(true));
+  if (payloadWorkbenchLogRefresh)
+    payloadWorkbenchLogRefresh.addEventListener("click", () => loadPayloadLog(true));
   if (activePayloadStop)
     activePayloadStop.addEventListener("click", () => stopPayload());
   if (networkRefresh)
@@ -3476,7 +3575,7 @@
       loadPayloads();
       loadHeadlessStatus();
       loadNetworkStatus();
-      loadPayloadLog();
+      pollPayloadStatus().then(() => loadPayloadLog()).catch(() => loadPayloadLog());
       schedulePayloadPoll();
       scheduleSystemPoll();
     });

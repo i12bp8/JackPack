@@ -252,6 +252,7 @@
         </div>
         <button id="navNetwork" type="button" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-slate-400/20 bg-slate-800/40 text-slate-300 hover:text-white hover:bg-slate-700/50 transition"><i class="fa-solid fa-tower-cell mr-2"></i>Connect</button>
         <button id="navPayloads" type="button" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-slate-400/20 bg-slate-800/40 text-slate-300 hover:text-white hover:bg-slate-700/50 transition"><i class="fa-solid fa-layer-group mr-2"></i>Payloads</button>
+        <button id="navTerminal" type="button" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-slate-400/20 bg-slate-800/40 text-slate-300 hover:text-white hover:bg-slate-700/50 transition"><i class="fa-solid fa-terminal mr-2"></i>Terminal</button>
         <button id="navLoot" type="button" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-slate-400/20 bg-slate-800/40 text-slate-300 hover:text-white hover:bg-slate-700/50 transition"><i class="fa-solid fa-vault mr-2"></i>Loot</button>
         <button id="navSettings" type="button" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-slate-400/20 bg-slate-800/40 text-slate-300 hover:text-white hover:bg-slate-700/50 transition"><i class="fa-solid fa-sliders mr-2"></i>Settings</button>
         <a id="navPayloadStudio" href="./ide.html" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-slate-400/20 bg-slate-800/40 text-slate-300 hover:text-white hover:bg-slate-700/50 transition block"><i class="fa-solid fa-code mr-2"></i>Payload Studio</a>
@@ -292,6 +293,7 @@
         <button type="button" data-mobile-tab="device" class="jp-mobile-active"><i class="fa-solid fa-gauge-high"></i><span>Home</span></button>
         <button type="button" data-mobile-tab="network"><i class="fa-solid fa-tower-cell"></i><span>Connect</span></button>
         <button type="button" data-mobile-tab="payloads"><i class="fa-solid fa-layer-group"></i><span>Payloads</span></button>
+        <button type="button" data-mobile-tab="terminal"><i class="fa-solid fa-terminal"></i><span>Term</span></button>
         <button type="button" data-mobile-tab="loot"><i class="fa-solid fa-vault"></i><span>Loot</span></button>
         <button type="button" data-mobile-tab="settings"><i class="fa-solid fa-sliders"></i><span>Config</span></button>
       </div>
@@ -347,54 +349,30 @@
           </div>
           <pre id="payloadLogTail" class="jp-log">No log output yet.</pre>
         </section>
-
-        <div id="compatDeviceLayout" class="jp-console-panel">
-          <div class="min-w-0">
-            <div class="terminal-wrap">
-              <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800/70">
-                <div>
-                  <div class="text-sm font-semibold text-emerald-300">Terminal</div>
-                  <div class="text-[11px] text-slate-500">On-demand shell, kept out of the way until you need it.</div>
-                </div>
-                <div class="flex items-center gap-2">
-                  <div id="shellStatus" class="text-[11px] text-slate-400">Disconnected</div>
-                  <button id="shellConnect" type="button" class="px-3 py-1.5 text-xs rounded-lg bg-emerald-600/80 border border-emerald-300/30 text-white hover:bg-emerald-500/80 transition">Open</button>
-                  <button id="shellDisconnect" type="button" class="px-3 py-1.5 text-xs rounded-lg bg-slate-800/80 border border-slate-600/40 text-slate-200 hover:bg-slate-700/80 transition">Close</button>
-                </div>
-              </div>
-              <div id="terminal" class="terminal-body"></div>
-            </div>
-          </div>
-
-      </div>
       </div>
 
       <!-- Payload library -->
       <div id="payloadTab" class="hidden space-y-4">
-        <section class="jp-hero jp-hero-compact">
-          <div class="jp-hero-main">
-            <div class="text-[11px] uppercase tracking-[0.18em] text-emerald-300">Payload Library</div>
-            <h1>Launch</h1>
+        <section class="jp-page-head">
+          <div class="min-w-0">
+            <div class="jp-kicker">Payload Workbench</div>
+            <h1>Payloads</h1>
             <div id="payloadSummary" class="jp-hero-meta">
               <span>Loading payloads</span>
             </div>
           </div>
-          <div class="jp-hero-payload">
-            <div class="text-[11px] uppercase tracking-[0.16em] text-slate-500">Active Payload</div>
-            <div id="payloadLibraryActive" class="mt-1 text-lg font-semibold text-slate-100">None</div>
-            <div class="mt-3 flex flex-wrap gap-2">
-              <button id="payloadLibraryStop" type="button" class="jp-btn jp-btn-danger hidden"><i class="fa-solid fa-stop"></i> Stop</button>
-              <button id="payloadLibraryRefresh" type="button" class="jp-btn"><i class="fa-solid fa-rotate"></i> Refresh</button>
-            </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="payloadLibraryStop" type="button" class="jp-btn jp-btn-danger hidden"><i class="fa-solid fa-stop"></i> Stop</button>
+            <button id="payloadLibraryRefresh" type="button" class="jp-btn"><i class="fa-solid fa-rotate"></i> Refresh</button>
           </div>
         </section>
 
-        <section class="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-4">
+        <section class="jp-payload-workbench">
           <div class="jp-panel">
             <div class="jp-panel-head">
               <div>
                 <div class="jp-panel-title">Categories</div>
-                <div class="jp-panel-subtitle">Pick a workflow, then launch a payload.</div>
+                <div class="jp-panel-subtitle">Grouped workflows with descriptions.</div>
               </div>
             </div>
             <label class="jp-field">
@@ -412,17 +390,75 @@
             </div>
             <div id="payloadQuickGrid" class="jp-payload-list"></div>
           </div>
-        </section>
 
-        <section class="jp-panel">
-          <div class="jp-panel-head">
-            <div>
-              <div class="jp-panel-title">Payload Controls</div>
-              <div id="payloadControlStatus" class="jp-panel-subtitle">Start a payload to use live actions.</div>
+          <div class="jp-panel jp-active-run-panel">
+            <div class="jp-panel-head">
+              <div class="min-w-0">
+                <div class="jp-panel-title">Active Run</div>
+                <div id="payloadControlStatus" class="jp-panel-subtitle">Start a payload to use live actions.</div>
+              </div>
+              <button id="payloadWorkbenchStop" type="button" class="jp-btn jp-btn-danger hidden"><i class="fa-solid fa-stop"></i> Stop</button>
+            </div>
+            <div class="jp-run-card">
+              <div class="text-[11px] uppercase tracking-[0.16em] text-slate-500">Payload</div>
+              <div id="payloadLibraryActive" class="mt-1 text-lg font-semibold text-slate-100">None</div>
+              <div id="payloadWorkbenchMeta" class="mt-1 text-xs text-slate-400">Ready</div>
+            </div>
+            <div class="mt-3">
+              <div class="jp-mini-title">Actions</div>
+              <div id="payloadActionGrid" class="jp-action-grid mt-2"></div>
+            </div>
+            <div class="mt-4">
+              <div class="flex items-center justify-between gap-2">
+                <div>
+                  <div class="jp-mini-title">Live Output</div>
+                  <div id="payloadWorkbenchLogStatus" class="jp-panel-subtitle">Current run</div>
+                </div>
+                <button id="payloadWorkbenchLogRefresh" type="button" class="jp-btn"><i class="fa-solid fa-terminal"></i> Tail</button>
+              </div>
+              <pre id="payloadWorkbenchLogTail" class="jp-log jp-log-compact mt-2">No log output yet.</pre>
             </div>
           </div>
-          <div id="payloadActionGrid" class="jp-action-grid"></div>
-          <div class="mt-3 jp-panel-subtitle">These are semantic payload actions sent to the running process. Forms handle setup before launch; this panel handles runtime actions.</div>
+        </section>
+      </div>
+
+      <!-- Terminal -->
+      <div id="terminalTab" class="hidden space-y-4">
+        <section class="jp-page-head">
+          <div class="min-w-0">
+            <div class="jp-kicker">Fast Shell</div>
+            <h1>Terminal</h1>
+            <div class="jp-hero-meta">
+              <span>PTY over WebSocket</span>
+              <span>Open only when you need it</span>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <div id="shellStatus" class="text-[11px] text-slate-400">Disconnected</div>
+            <button id="shellConnect" type="button" class="jp-btn jp-btn-primary"><i class="fa-solid fa-plug"></i> Open</button>
+            <button id="shellDisconnect" type="button" class="jp-btn jp-btn-muted"><i class="fa-solid fa-xmark"></i> Close</button>
+          </div>
+        </section>
+
+        <section class="jp-terminal-grid">
+          <div class="jp-panel terminal-wrap shell-open">
+            <div id="terminal" class="terminal-body"></div>
+          </div>
+          <div class="jp-panel">
+            <div class="jp-panel-head">
+              <div>
+                <div class="jp-panel-title">Quick Ops</div>
+                <div class="jp-panel-subtitle">Common field commands for updates, network, and payload logs.</div>
+              </div>
+            </div>
+            <div class="jp-quick-command-list">
+              <button type="button" data-shell-command="git status --short && git pull --ff-only origin main"><i class="fa-solid fa-cloud-arrow-down"></i><span>Pull latest</span></button>
+              <button type="button" data-shell-command="sudo systemctl restart packjack-web.service packjack-ws.service"><i class="fa-solid fa-rotate"></i><span>Restart WebUI</span></button>
+              <button type="button" data-shell-command="nmcli dev status && ip -br addr"><i class="fa-solid fa-network-wired"></i><span>Network status</span></button>
+              <button type="button" data-shell-command="tail -n 120 loot/payload.log"><i class="fa-solid fa-file-lines"></i><span>Tail payload log</span></button>
+              <button type="button" data-shell-command="python3 -m unittest tests/test_extensions.py tests/test_web_server.py"><i class="fa-solid fa-vial"></i><span>Run smoke tests</span></button>
+            </div>
+          </div>
         </section>
       </div>
 
