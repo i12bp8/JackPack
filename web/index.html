@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RaspyJack WebUi</title>
+  <title>JackPack Control Deck</title>
   <script src="./vendor/js/tailwind.js"></script>
   <link rel="stylesheet" href="./vendor/css/xterm.css">
   <link rel="stylesheet" href="./vendor/css/fontawesome.min.css">
@@ -343,16 +343,16 @@
     <aside id="sidebar" class="fixed md:sticky md:top-0 md:h-screen inset-y-0 left-0 z-40 w-64 -translate-x-full md:translate-x-0 transform transition bg-slate-950/60 border-r border-slate-800/70 backdrop-blur flex flex-col">
       <div class="p-4 border-b border-slate-800/70">
         <div class="flex items-center gap-3 select-none">
-          <img src="./raspyjack.png" alt="RaspyJack" class="h-10 drop-shadow-[0_0_16px_rgba(18,255,120,0.25)]"/>
+          <img src="./jackpack.png" alt="JackPack" class="h-10 drop-shadow-[0_0_16px_rgba(18,255,120,0.25)]"/>
           <div>
-            <div class="text-lg font-black tracking-wide"><span class="text-emerald-400">R</span>ASPY<span class="text-rose-400">J</span>ACK</div>
-            <div class="text-[11px] text-slate-400">Remote Control</div>
+            <div class="text-lg font-black tracking-wide"><span class="text-emerald-400">J</span>ACK<span class="text-rose-400">P</span>ACK</div>
+            <div class="text-[11px] text-slate-400">Phone-first Pi 5</div>
           </div>
         </div>
       </div>
 
       <nav class="p-3 space-y-2 flex-1 min-h-0 overflow-y-auto overscroll-contain">
-        <button id="navDevice" type="button" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-emerald-400/30 bg-emerald-500/10 text-emerald-300 shadow-[0_0_16px_rgba(16,185,129,0.15)]"><i class="fa-solid fa-gamepad mr-2"></i>Device</button>
+        <button id="navDevice" type="button" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-emerald-400/30 bg-emerald-500/10 text-emerald-300 shadow-[0_0_16px_rgba(16,185,129,0.15)]"><i class="fa-solid fa-terminal mr-2"></i>Console</button>
         <button id="navSystem" type="button" class="w-full px-3 py-2 rounded-xl text-left text-sm font-semibold border border-slate-400/20 bg-slate-800/40 text-slate-300 hover:text-white hover:bg-slate-700/50 transition"><i class="fa-solid fa-microchip mr-2"></i>System</button>
         <div id="systemDropdown" class="hidden rounded-xl border border-slate-800/80 bg-slate-950/40 p-2 space-y-2">
           <div class="flex items-center justify-between">
@@ -431,7 +431,7 @@
       <div class="flex items-center justify-between mb-4 md:mb-6 px-3 py-2 border border-slate-800/70 bg-slate-950/45 backdrop-blur rounded-xl">
         <div class="flex items-center gap-2 text-[11px] text-slate-300">
           <i class="fa-solid fa-terminal text-emerald-400"></i>
-          <span class="tracking-wide">WEBUI CONTROL DECK</span>
+          <span class="tracking-wide">JACKPACK CONTROL DECK</span>
         </div>
         <div class="flex items-center gap-2">
           <button id="menuToggle" type="button" class="md:hidden px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-600/40 text-slate-200"><i class="fa-solid fa-bars"></i></button>
@@ -441,7 +441,66 @@
 
       <!-- Device card -->
       <div id="deviceTab" class="block">
-        <div class="flex flex-col lg:flex-row lg:items-start lg:gap-6">
+        <section class="jp-hero mb-4 md:mb-6">
+          <div class="jp-hero-main">
+            <div class="text-[11px] uppercase tracking-[0.18em] text-emerald-300">Headless Rig</div>
+            <h1>JackPack</h1>
+            <div class="jp-hero-meta">
+              <span id="headlessMode">Checking runtime</span>
+              <span id="headlessAp">AP pending</span>
+              <span id="headlessAttack">Adapter pending</span>
+            </div>
+          </div>
+          <div class="jp-hero-payload">
+            <div class="text-[11px] uppercase tracking-[0.16em] text-slate-500">Active Payload</div>
+            <div id="activePayloadTitle" class="mt-1 text-lg font-semibold text-slate-100">None</div>
+            <div id="activePayloadMeta" class="mt-1 text-xs text-slate-400">Ready</div>
+            <button id="activePayloadStop" type="button" class="mt-3 hidden px-3 py-1.5 text-xs rounded-lg bg-rose-600/80 border border-rose-300/30 text-white hover:bg-rose-500/80 transition">Stop Payload</button>
+          </div>
+        </section>
+
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4 md:mb-6">
+          <div class="jp-card">
+            <div class="jp-card-label"><i class="fa-solid fa-wifi"></i> Control AP</div>
+            <div id="controlApValue" class="jp-card-value">wlan0</div>
+            <div id="controlApMeta" class="jp-card-meta">Phone access point</div>
+          </div>
+          <div class="jp-card">
+            <div class="jp-card-label"><i class="fa-solid fa-satellite-dish"></i> Attack WiFi</div>
+            <div id="attackWifiValue" class="jp-card-value">wlan1</div>
+            <div id="attackWifiMeta" class="jp-card-meta">External USB adapter</div>
+          </div>
+          <div class="jp-card">
+            <div class="jp-card-label"><i class="fa-solid fa-network-wired"></i> Wired</div>
+            <div id="wiredValue" class="jp-card-value">eth0</div>
+            <div id="wiredMeta" class="jp-card-meta">Built-in Ethernet</div>
+          </div>
+        </section>
+
+        <section class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] gap-4 mb-4 md:mb-6">
+          <div class="jp-panel">
+            <div class="jp-panel-head">
+              <div>
+                <div class="jp-panel-title">Payload Launchpad</div>
+                <div id="payloadSummary" class="jp-panel-subtitle">Loading payloads</div>
+              </div>
+              <button id="payloadsRefreshMain" type="button" class="px-3 py-1.5 text-xs rounded-lg bg-slate-800/70 border border-slate-600/40 text-slate-200 hover:bg-slate-700/70 transition">Refresh</button>
+            </div>
+            <div id="payloadQuickGrid" class="jp-payload-grid"></div>
+          </div>
+          <div class="jp-panel">
+            <div class="jp-panel-head">
+              <div>
+                <div class="jp-panel-title">Payload Log</div>
+                <div id="payloadLogStatus" class="jp-panel-subtitle">Last output</div>
+              </div>
+              <button id="payloadLogRefresh" type="button" class="px-3 py-1.5 text-xs rounded-lg bg-slate-800/70 border border-slate-600/40 text-slate-200 hover:bg-slate-700/70 transition">Tail</button>
+            </div>
+            <pre id="payloadLogTail" class="jp-log">No log output yet.</pre>
+          </div>
+        </section>
+
+        <div id="compatDeviceLayout" class="flex flex-col lg:flex-row lg:items-start lg:gap-6">
           <div class="lg:order-1 order-2 flex-1 min-w-0">
             <div class="terminal-wrap lg:border-r lg:border-slate-400/20 lg:pr-6">
               <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800/70">
@@ -459,7 +518,7 @@
           <div class="lg:order-2 order-1 flex justify-center lg:justify-end w-full lg:w-auto">
             <div id="deviceShell" data-theme="neon" class="device-shell theme-neon rounded-3xl p-3 sm:p-4 xl:p-5 w-fit mx-auto lg:mx-0 overflow-hidden" style="max-width:100vw">
       <div class="pager-clip" aria-hidden="true"></div>
-      <div class="pager-brand">RaspyJack P200</div>
+      <div class="pager-brand">JackPack P5</div>
       <div class="pager-speaker" aria-hidden="true">
         <span></span><span></span><span></span><span></span><span></span>
       </div>
@@ -772,4 +831,3 @@
   <script src="./app.js"></script>
 </body>
 </html>
-

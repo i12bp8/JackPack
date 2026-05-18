@@ -3,12 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RaspyJack AI</title>
+  <title>JackPack AI</title>
   <script>
-    // WebGPU requires secure context (HTTPS) — auto-redirect if on HTTP
-    if (location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-      location.replace('https://' + location.hostname + location.pathname + location.search + location.hash);
-    }
+    // JackPack serves the field WebUI over the local AP by default.
+    // Browsers that require a secure WebGPU context will show the in-page setup notice.
   </script>
   <link rel="stylesheet" href="./vendor/css/fontawesome.min.css">
   <link rel="stylesheet" href="./vendor/css/google-fonts.css">
@@ -377,7 +375,7 @@
   <header>
     <div class="logo">
       <i class="fa-solid fa-robot"></i>
-      <h1>RaspyJack AI</h1>
+      <h1>JackPack AI</h1>
     </div>
     <div class="controls">
       <div id="status">
@@ -461,7 +459,7 @@
         <span style="font-weight:600;font-size:14px;"><i class="fa-solid fa-folder-open" style="color:var(--rj-accent);margin-right:8px;"></i>Loot Files</span>
         <button class="icon-btn" onclick="closeLootModal()"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <div id="loot-path" style="padding:6px 18px;font-size:11px;color:var(--rj-text-muted);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--rj-border);">/root/Raspyjack/loot</div>
+      <div id="loot-path" style="padding:6px 18px;font-size:11px;color:var(--rj-text-muted);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--rj-border);">loot/</div>
       <div id="loot-list" style="flex:1;overflow-y:auto;padding:8px;"></div>
     </div>
   </div>
@@ -523,7 +521,7 @@
     let isGenerating = false;
     let stopRequested = false;
 
-    const DEFAULT_SYSTEM_PROMPT = `RaspyJackLLM is for experienced users in the field of red teaming and cybersecurity, providing advanced and highly technical guidance. It specializes in detailed explanations of complex Linux commands, sophisticated techniques using Kali Linux tools, and nuanced strategies for penetration testing. RaspyJackLLM is designed to assist in conducting advanced penetration tests, offering expert-level instructions, insights into complex scenarios, and advice on employing advanced tools and methodologies. It upholds ethical hacking principles, focusing on legal and responsible penetration testing practices. RaspyJackLLM will use technical jargon and advanced language suitable for professionals, and will only simplify explanations when specifically requested. In ambiguous or unclear situations, it will seek clarification to provide the most accurate and relevant advice. Its personality is that of a seasoned cybersecurity expert, making it a reliable resource for professionals seeking in-depth technical knowledge. I want each request to be answered with a line of code, a command or a technique to perform the request. The goal is to have technical help and a guide which allows the user to launch the different attacks via command lines, kali linux program and script to perform its penetration test. If the user gives the return of a command analyzes the response and proposes a continuation for the next step to take.`;
+    const DEFAULT_SYSTEM_PROMPT = `JackPack AI assists with authorized security research, internal red-team operations, lab work, and defensive validation only. Keep guidance tied to systems the operator owns or is explicitly authorized to assess. Prefer safe setup, verification, logging, cleanup, and troubleshooting steps. Refuse requests for unauthorized access, credential theft, persistence on third-party systems, disruption, fraud, surveillance, or evasion of lawful controls.`;
 
     // Load custom prompt from localStorage or use default
     let SYSTEM_PROMPT = localStorage.getItem("rj_llm_prompt") || DEFAULT_SYSTEM_PROMPT;
@@ -739,7 +737,7 @@
       msgEl.className = "message " + role;
       const roleLabel = document.createElement("div");
       roleLabel.className = "role";
-      roleLabel.textContent = role === "user" ? "You" : "RaspyJack AI";
+      roleLabel.textContent = role === "user" ? "You" : "JackPack AI";
       const contentEl = document.createElement("div");
       contentEl.className = "content";
       contentEl.textContent = content;

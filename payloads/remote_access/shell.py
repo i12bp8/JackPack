@@ -18,7 +18,7 @@ Quit : *Esc* on keyboard **or** **KEY3** on the HAT.
 import os, sys, time, signal, select, fcntl, pty, re
 sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..', '..')))
 
-import LCD_1in44, LCD_Config          # Waveshare LCD driver
+from packjack.compat import LCD_1in44, LCD_Config          # Waveshare LCD driver
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from evdev import InputDevice, categorize, ecodes, list_devices

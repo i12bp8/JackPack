@@ -5,7 +5,8 @@ set -euo pipefail
 # - onboard Pi WiFi (mmc) -> wlan0
 # - first USB WiFi dongle (usb) -> wlan1
 
-LOG_FILE="/root/Raspyjack/loot/network/wifi_pin_boot.log"
+JACKPACK_INSTALL_DIR="${JACKPACK_INSTALL_DIR:-/root/JackPack}"
+LOG_FILE="$JACKPACK_INSTALL_DIR/loot/network/wifi_pin_boot.log"
 mkdir -p "$(dirname "$LOG_FILE")"
 
 log() {

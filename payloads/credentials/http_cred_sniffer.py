@@ -11,7 +11,7 @@ and Set-Cookie headers.
 Controls:
   OK         -- Start / stop sniffing
   UP / DOWN  -- Scroll captured credentials
-  KEY1       -- Toggle interface (eth0 / wlan0)
+  KEY1       -- Toggle interface (eth0 / wlan1)
   KEY2       -- Export results to loot
   KEY3       -- Exit
 
@@ -31,8 +31,8 @@ from urllib.parse import unquote_plus
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -51,7 +51,7 @@ PINS = {
 WIDTH, HEIGHT = LCD_1in44.LCD_WIDTH, LCD_1in44.LCD_HEIGHT
 ROWS_VISIBLE = 6
 LOOT_DIR = "/root/Raspyjack/loot/HTTPCreds"
-INTERFACES = ["eth0", "wlan0"]
+INTERFACES = ["eth0", "wlan1"]
 
 # Credential field names to search in POST bodies
 CRED_FIELDS = re.compile(

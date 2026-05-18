@@ -5,14 +5,14 @@ RaspyJack Payload -- Captive Portal
 Author: 7h30th3r0n3
 
 Full captive portal with menu-driven management: start/stop/restart the AP,
-select portal page from DNSSpoof/sites/ or built-in templates, edit SSID,
+select a built-in portal template, edit SSID,
 manage MAC whitelist, view captured credentials.
 
 Setup / Prerequisites
 ---------------------
 - USB WiFi dongle with AP mode support (e.g. Alfa AWUS036ACH)
 - apt install hostapd dnsmasq-base
-- Optional: phishing templates in /root/Raspyjack/DNSSpoof/sites/
+- Built-in templates are embedded in this payload.
 - Dongle is auto-detected via select_interface (onboard wlan0 reserved)
 
 Controls:
@@ -40,7 +40,7 @@ from socketserver import ThreadingMixIn
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44, LCD_Config
+from packjack.compat import LCD_1in44, LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -63,7 +63,7 @@ font = scaled_font()
 # ---------------------------------------------------------------------------
 # Paths & constants
 # ---------------------------------------------------------------------------
-PORTAL_DIR = "/root/Raspyjack/DNSSpoof/sites"
+PORTAL_DIR = "/root/JackPack/config/portal_sites"
 LOOT_DIR = "/root/Raspyjack/loot/Portal"
 CONFIG_PATH = os.path.join(LOOT_DIR, "portal_config.json")
 WHITELIST_PATH = os.path.join(LOOT_DIR, "whitelist.json")
@@ -724,7 +724,7 @@ def draw_select_portal():
     if not portals:
         d.text((4, 40), "No portals found", font=font, fill="#FF4444")
         d.text((4, 54), "Add dirs to:", font=font, fill="#666")
-        d.text((4, 66), "DNSSpoof/sites/", font=font, fill="#666")
+        d.text((4, 66), "config/portal_sites/", font=font, fill="#666")
         d.text((4, 82), "Or leave empty for", font=font, fill="#666")
         d.text((4, 94), "built-in template", font=font, fill="#666")
     else:

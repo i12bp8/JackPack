@@ -29,8 +29,8 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -46,7 +46,7 @@ PINS = {
 WIDTH, HEIGHT = LCD_1in44.LCD_WIDTH, LCD_1in44.LCD_HEIGHT
 
 DEFAULT_IFACE = "br0"
-FALLBACK_IFACES = ["br0", "eth0", "wlan0"]
+FALLBACK_IFACES = ["br0", "eth0", "wlan1"]
 MIN_BW_MBIT = 1
 MAX_BW_MBIT = 100
 DEFAULT_BW_MBIT = 10

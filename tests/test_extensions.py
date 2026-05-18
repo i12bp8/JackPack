@@ -9,8 +9,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import EXTENSIONS._bluez as BLUEZ
-from EXTENSIONS.api import REQUIRE_CAPABILITY, WAIT_FOR_NOTPRESENT, WAIT_FOR_PRESENT
+import extensions._bluez as BLUEZ
+from extensions.api import REQUIRE_CAPABILITY, WAIT_FOR_NOTPRESENT, WAIT_FOR_PRESENT
 
 
 class ExtensionTests(unittest.TestCase):

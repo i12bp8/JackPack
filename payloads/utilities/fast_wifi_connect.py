@@ -25,7 +25,7 @@ font = None
 def _init_lcd():
     global LCD_OK, LCD, font, WIDTH, HEIGHT
     try:
-        import LCD_1in44, LCD_Config  # type: ignore
+        from packjack.compat import LCD_1in44, LCD_Config  # type: ignore
         from PIL import ImageFont  # type: ignore
 
         LCD_Config.GPIO_Init()

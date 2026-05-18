@@ -31,7 +31,7 @@ import threading
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44, LCD_Config
+from packjack.compat import LCD_1in44, LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -58,7 +58,7 @@ LED_PATHS = {
     "PWR": ["/sys/class/leds/PWR/brightness", "/sys/class/leds/led1/brightness"],
 }
 STEALTH_HOSTNAME = "localhost"
-WIFI_IFACE = "wlan0"
+WIFI_IFACE = os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1"))
 MIN_TX_POWER = "1"
 GENERIC_OUI_PREFIXES = [
     "02:00:00", "02:42:ac", "02:50:00", "06:00:00",
@@ -154,7 +154,7 @@ def _get_interfaces():
         entries = os.listdir("/sys/class/net")
         return [e for e in entries if e != "lo"]
     except Exception:
-        return ["eth0", "wlan0"]
+        return ["eth0", "wlan1"]
 
 
 def _find_led_path(led_name):

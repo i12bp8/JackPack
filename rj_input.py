@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-RaspyJack input bridge
+JackPack input bridge
 ----------------------
 Listens on a Unix datagram socket for JSON input events coming from the
 WebSocket server and exposes a tiny queue API so the main UI can treat them
@@ -22,7 +22,7 @@ from typing import Optional
 
 _SOCK_PATH = os.environ.get("RJ_INPUT_SOCK", "/dev/shm/rj_input.sock")
 
-# Map frontend button names to RaspyJack getButton() return values
+# Map frontend button names to legacy getButton() return values
 _BTN_MAP = {
     "UP": "KEY_UP_PIN",
     "DOWN": "KEY_DOWN_PIN",

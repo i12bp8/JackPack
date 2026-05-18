@@ -27,8 +27,8 @@ import shutil
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -80,7 +80,7 @@ signal.signal(signal.SIGTERM, _signal_handler)
 
 def _get_local_ip():
     """Get the first non-loopback IP address."""
-    for iface in ["eth0", "wlan0", "tailscale0"]:
+    for iface in ["eth0", "wlan1", "tailscale0"]:
         try:
             res = subprocess.run(
                 ["ip", "-4", "addr", "show", "dev", iface],

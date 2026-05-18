@@ -30,8 +30,8 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -77,10 +77,11 @@ arp_entries = []  # [{"ip", "mac", "iface"}]
 # WiFi scan
 # ---------------------------------------------------------------------------
 def _scan_wifi():
-    """Scan nearby WiFi APs via iw dev wlan0 scan."""
+    """Scan nearby WiFi APs via the JackPack payload WiFi adapter."""
+    iface = os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1"))
     try:
         result = subprocess.run(
-            ["iw", "dev", "wlan0", "scan"],
+            ["iw", "dev", iface, "scan"],
             capture_output=True, text=True, timeout=15,
         )
     except FileNotFoundError:
@@ -387,7 +388,7 @@ def _draw_wifi_tab(d, font, sc):
 
     if not ap_list:
         d.text((6, 40), "No APs found", font=font, fill="#666")
-        d.text((6, 52), "Ensure wlan0 is up", font=font, fill="#555")
+        d.text((6, 52), "Ensure payload WiFi is up", font=font, fill="#555")
         return
 
     visible = ap_list[sc:sc + ROWS_VISIBLE]

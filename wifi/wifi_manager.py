@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-RaspyJack WiFi Management System
+JackPack WiFi Management System
 ===============================
-Dual-interface support for RaspyJack - use both eth0 and WiFi dongles
+Pi 5 network policy: wlan0 is the control AP, wlan1 is the payload WiFi adapter,
+and eth0 is the built-in wired target port.
 
 Features:
 - WiFi profile management (save/load network credentials)
 - Network scanning and connection
 - Interface priority and selection
-- Integration with RaspyJack LCD interface
+- Headless-friendly interface priority
 - Automatic reconnection and failover
 
-Author: RaspyJack WiFi Integration
 """
 
 import os
@@ -23,10 +23,15 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-# Try to import RaspyJack LCD modules
 try:
-    sys.path.append('/root/Raspyjack/')
-    import LCD_1in44, LCD_Config
+    from packjack import interfaces as jp_ifaces
+except Exception:
+    jp_ifaces = None
+
+# Try to import LCD compatibility modules for legacy payloads.
+try:
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from packjack.compat import LCD_1in44, LCD_Config
     from PIL import Image, ImageDraw, ImageFont
     import RPi.GPIO as GPIO
     LCD_AVAILABLE = True
@@ -35,7 +40,8 @@ except Exception:
 
 class WiFiManager:
     def __init__(self):
-        self.base_dir = "/root/Raspyjack/wifi"
+        install_dir = os.environ.get("JACKPACK_INSTALL_DIR", "/root/JackPack")
+        self.base_dir = f"{install_dir}/wifi"
         self.profiles_dir = f"{self.base_dir}/profiles"
         self.current_profile_file = f"{self.base_dir}/current_profile.json"
         self.log_file = f"{self.base_dir}/wifi.log"
@@ -91,8 +97,10 @@ class WiFiManager:
         except Exception as e:
             self.log(f"Error detecting WiFi interfaces: {e}")
         
-        # Sort interfaces (prefer wlan0 built-in for connectivity, wlan1+ for attacks)
-        interfaces.sort(key=lambda x: (x != 'wlan0', x != 'wlan1', x))
+        attack_iface = jp_ifaces.attack_wifi_iface() if jp_ifaces else os.environ.get("JACKPACK_ATTACK_IFACE", "wlan1")
+        control_iface = jp_ifaces.ap_iface() if jp_ifaces else os.environ.get("JACKPACK_AP_IFACE", "wlan0")
+        interfaces = [iface for iface in interfaces if iface != control_iface]
+        interfaces.sort(key=lambda x: (x != attack_iface, x))
         
         self.log(f"Final detected WiFi interfaces: {interfaces}")
         return interfaces
@@ -424,9 +432,12 @@ class WiFiManager:
         self.log(f"Active interface set to: {iface}")
 
     def get_active_interface(self):
-        """Return the user-selected interface, or first available."""
+        """Return the user-selected payload WiFi interface, or the configured adapter."""
         if self.selected_interface and self.selected_interface in self.wifi_interfaces:
             return self.selected_interface
+        attack_iface = jp_ifaces.attack_wifi_iface() if jp_ifaces else os.environ.get("JACKPACK_ATTACK_IFACE", "wlan1")
+        if attack_iface in self.wifi_interfaces:
+            return attack_iface
         return self.wifi_interfaces[0] if self.wifi_interfaces else None
 
     def get_interface_for_tool(self, preferred="auto"):
@@ -440,8 +451,7 @@ class WiFiManager:
             if status["status"] == "connected":
                 return status["interface"]
 
-            # Fall back to ethernet
-            return "eth0"
+            return jp_ifaces.wired_iface() if jp_ifaces else os.environ.get("JACKPACK_WIRED_IFACE", "eth0")
         
         return preferred
 
@@ -449,8 +459,9 @@ class WiFiManager:
 wifi_manager = WiFiManager()
 
 def get_available_interfaces():
-    """Get list of available network interfaces for RaspyJack tools."""
-    interfaces = ["eth0"]  # Always include ethernet
+    """Get list of available interfaces for JackPack tools."""
+    wired = jp_ifaces.wired_iface() if jp_ifaces else os.environ.get("JACKPACK_WIRED_IFACE", "eth0")
+    interfaces = [wired]
     interfaces.extend(wifi_manager.wifi_interfaces)
     return interfaces
 

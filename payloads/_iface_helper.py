@@ -1,5 +1,5 @@
 """
-Shared network interface detection and LCD selection helper.
+Shared network interface detection and selection helper.
 
 Usage in a payload:
     from payloads._iface_helper import select_interface
@@ -22,6 +22,11 @@ import subprocess
 import time
 
 from payloads._input_helper import get_button
+
+try:
+    from packjack import interfaces as jp_ifaces
+except Exception:
+    jp_ifaces = None
 
 try:
     from payloads._display_helper import ScaledDraw
@@ -54,6 +59,46 @@ def _is_onboard_wifi(iface):
     except Exception:
         pass
     return _get_driver(iface) == "brcmfmac"
+
+
+def _env_iface(kind, default):
+    if jp_ifaces is not None:
+        if kind == "ap":
+            return jp_ifaces.ap_iface()
+        if kind == "attack":
+            return jp_ifaces.attack_wifi_iface()
+        if kind == "wired":
+            return jp_ifaces.wired_iface()
+    env_names = {
+        "ap": ("JACKPACK_AP_IFACE", "PACKJACK_AP_IFACE"),
+        "attack": ("JACKPACK_ATTACK_IFACE", "PACKJACK_ATTACK_IFACE"),
+        "wired": ("JACKPACK_WIRED_IFACE", "PACKJACK_WIRED_IFACE"),
+    }
+    for name in env_names.get(kind, ()):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    return default
+
+
+def get_control_iface():
+    return _env_iface("ap", "wlan0")
+
+
+def get_attack_wifi_iface():
+    return _env_iface("attack", "wlan1")
+
+
+def get_wired_iface():
+    return _env_iface("wired", "eth0")
+
+
+def get_default_interface(iface_type="any"):
+    if iface_type == "wifi":
+        return get_attack_wifi_iface()
+    if iface_type in {"eth", "wired"}:
+        return get_wired_iface()
+    return get_wired_iface()
 
 
 # Drivers known to support monitor+injection but not reporting it via nl80211
@@ -128,13 +173,13 @@ def _is_up(iface):
         return False
 
 
-def list_interfaces(iface_type="any"):
+def list_interfaces(iface_type="any", include_control=False):
     """
     Return list of interface info dicts matching the requested type.
 
     iface_type:
-        "wifi"  -- only wlan* interfaces
-        "eth"   -- only eth*, enp*, ens*, usb* (non-wireless)
+        "wifi"  -- only WiFi payload interfaces, excluding control AP by default
+        "eth"   -- only non-wireless wired interfaces, preferring Pi 5 eth0
         "any"   -- all non-loopback, non-virtual interfaces
 
     Each dict: {name, driver, is_onboard, is_wifi, is_up, ip, supports_ap, supports_monitor}
@@ -146,16 +191,21 @@ def list_interfaces(iface_type="any"):
     except Exception:
         return result
 
+    control_iface = get_control_iface()
+    attack_iface = get_attack_wifi_iface()
+    wired_iface = get_wired_iface()
+
     for name in all_ifaces:
         if name == "lo":
             continue
 
         is_wifi = os.path.isdir(f"/sys/class/net/{name}/wireless")
         is_virtual = os.path.islink(f"/sys/class/net/{name}/device") is False
-        # Skip docker/veth/br/tailscale for "any" mode
         if name.startswith(("veth", "br-", "docker", "virbr")):
             continue
 
+        if is_wifi and name == control_iface and not include_control:
+            continue
         if iface_type == "wifi" and not is_wifi:
             continue
         if iface_type == "eth" and is_wifi:
@@ -173,16 +223,22 @@ def list_interfaces(iface_type="any"):
             "is_wifi": is_wifi,
             "is_up": up,
             "ip": ip,
+            "role": jp_ifaces.interface_role(name) if jp_ifaces is not None else (
+                "control_ap" if name == control_iface else
+                "attack_wifi" if name == attack_iface else
+                "wired_target" if name == wired_iface else
+                "wifi" if is_wifi else "network"
+            ),
             "supports_ap": _supports_mode(name, "AP") if is_wifi else False,
             "supports_monitor": _supports_mode(name, "monitor") if is_wifi else False,
         }
         result.append(info)
 
-    # Sort: USB WiFi first, onboard WiFi next, then eth by name
+    # Sort for JackPack: attack WiFi first for WiFi lists, Pi 5 eth0 first for wired.
     def _sort_key(i):
         if i["is_wifi"]:
-            return (0 if not i["is_onboard"] else 1, i["name"])
-        return (2, i["name"])
+            return (i["name"] != attack_iface, i["name"] == control_iface, i["is_onboard"], i["name"])
+        return (i["name"] != wired_iface, i["name"])
 
     return sorted(result, key=_sort_key)
 
@@ -278,7 +334,7 @@ def select_interface(lcd, font, pins, gpio, iface_type="any", title=None,
                     caps.append("mon")
                 tag = f"{src} {'+'.join(caps)}" if caps else src
             else:
-                tag = "ETH"
+                tag = "ETH0" if ifc["name"] == get_wired_iface() else "ETH"
                 if ifc["ip"]:
                     tag += f" {ifc['ip'][:12]}"
 

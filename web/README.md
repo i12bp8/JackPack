@@ -1,87 +1,38 @@
-# RaspyJack WebUI
+# JackPack WebUI
 
-This WebUI provides a browser-based remote control for the RaspyJack LCD UI.
-It streams LCD frames to the browser and forwards button input back to the device.
+The WebUI is the primary JackPack interface.
 
-## Required folders and files on device
-- `web/`
-  - `web/index.html`
-  - `web/app.js`
-  - `web/raspyjack.png`
-- `payloads/utilities/webui.py` (on-device controller that starts/stops the WebUI stack)
-- `device_server.py` (WebSocket server for frames + input)
-- `web_server.py` (static WebUI + read-only loot API)
-- `rj_input.py` (virtual input bridge for browser controls)
-- `LCD_1in44.py` and `LCD_Config.py` (LCD driver used by `payloads/utilities/webui.py`)
+## Access
 
-## Dependencies (install script)
-These are the WebUI-relevant packages in `install_raspyjack.sh`:
-- `python3-websockets` (WebSocket server dependency for `device_server.py`)
-- `python3-pil` (Pillow for LCD rendering in `payloads/utilities/webui.py`)
-- `python3-rpi.gpio` (GPIO input in `payloads/utilities/webui.py`)
-- `fonts-dejavu-core` (font files used by the on-device UI)
-- `procps` (provides `pkill`, used to stop the WebUI processes)
+After installation, open `http://jackpack.local:8080` from a device connected to the JackPack AP. If mDNS is unavailable on the client, use `http://10.66.0.1:8080`.
 
-## How it runs
-`payloads/utilities/webui.py` launches:
-- `device_server.py` (WebSocket server on port `8765`)
-- `web_server.py` (static frontend + loot API) on port `8080`
+## Entry Points
 
-Open in a browser (recommended):
-```
-https://<device-ip>/
-```
+- `index.html`: phone-first control deck.
+- `ide.html`: payload editor.
+- `wardriving.html`: wardriving session viewer.
+- `pcap.html` / `pcap-analyzer.html`: packet capture tools.
 
-Fallback during rollout/troubleshooting:
-```
-http://<device-ip>:8080
-```
+## Backend APIs
 
-## Authentication flow
-- First run: blocking setup overlay asks for admin username/password.
-- After setup: blocking login overlay appears on WebUI and IDE.
-- Successful login creates an HTTP-only session cookie used for API calls.
-- WebSocket access uses a short-lived WS ticket issued by `web_server.py`.
-- Emergency fallback: recovery token auth is still supported.
+Served by `web_server.py`:
 
-## HTTPS/WSS architecture
-- Public entrypoint: Caddy on `:443` (`https://<device-ip>/`).
-- Upstream Web UI/API: `127.0.0.1:8080` (proxied by Caddy).
-- Upstream device WebSocket: `127.0.0.1:8765` exposed as `wss://<device-ip>/ws`.
-- On HTTPS requests, the backend sets session cookies with `Secure; HttpOnly; SameSite=Strict`.
+- `/api/headless/status`
+- `/api/system/status`
+- `/api/payloads/list`
+- `/api/payloads/start`
+- `/api/payloads/stop`
+- `/api/payloads/status`
+- `/api/payloads/log`
+- `/api/loot/*`
+- `/api/auth/*`
 
-## Self-signed certificate trust
-- Installer config uses `tls internal` (self-signed local CA via Caddy).
-- First browser visit may show a certificate warning until trust is added.
-- You can continue with warning temporarily, or install/trust Caddy's local CA on your client for a clean lock icon.
+WebSocket features are served by `device_server.py`.
 
-## Migration and fallback behavior
-- Existing auth/session logic is unchanged; only transport is upgraded (HTTP -> HTTPS, WS -> WSS on `/ws`).
-- Legacy direct ports (`8080` and `8765`) remain available so access is not bricked if proxy setup fails.
-- If Caddy installation/configuration fails, installer prints remediation and keeps current services running.
+## Design Direction
 
-## Environment variables (optional)
-`device_server.py` supports:
-- `RJ_FRAME_PATH` (default `/dev/shm/raspyjack_last.jpg`)
-- `RJ_WS_HOST` (default `0.0.0.0`)
-- `RJ_WS_PORT` (default `8765`)
-- `RJ_FPS` (default `10`)
-- `RJ_WS_TOKEN` (optional shared token)
-- `RJ_WS_TOKEN_FILE` (optional token file; default `/root/Raspyjack/.webui_token`)
-- `RJ_WEB_AUTH_FILE` (default `/root/Raspyjack/.webui_auth.json`)
-- `RJ_WEB_AUTH_SECRET_FILE` (default `/root/Raspyjack/.webui_session_secret`)
-- `RJ_WEB_SESSION_TTL` (default `28800`)
-- `RJ_WEB_WS_TICKET_TTL` (default `120`)
-- `RJ_INPUT_SOCK` (default `/dev/shm/rj_input.sock`)
+The control deck should stay phone-first and headless-first. Avoid adding new
+LCD-emulator workflows as the main path. Legacy frame/input compatibility can
+remain available for payloads that still need it, but new features should use
+direct API controls and readable status panels.
 
-## Notes
-- The LCD frame mirror must exist at `RJ_FRAME_PATH`.
-- If you want browser input to control the UI, `rj_input.py` must be present and
-  the main UI must import it so it consumes virtual button events.
-
-## Local sanity check (JS syntax)
-From repo root:
-```bash
-./scripts/check_webui_js.sh
-```
-This verifies `web/shared.js`, `web/app.js`, and `web/ide.js` parse cleanly under Node.

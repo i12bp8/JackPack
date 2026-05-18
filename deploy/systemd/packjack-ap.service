@@ -1,0 +1,14 @@
+[Unit]
+Description=JackPack onboard WiFi access point
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=-/etc/packjack/packjack.env
+ExecStart=/root/JackPack/deploy/network/packjack-ap.sh
+ExecStop=/usr/bin/nmcli connection down jackpack-ap
+
+[Install]
+WantedBy=multi-user.target

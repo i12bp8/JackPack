@@ -10,7 +10,7 @@ loot/OSINT/, and shows found profile URLs on the 128×128 LCD.
 requirements
 -----------
   • python3
-  • Navarro present at /home/raspyjack/Navarro/navarro.py
+  • Navarro present at /home/raspyjack/vendor/navarro/navarro.py
   • qrcode sudo apt install -y python3-qrcode python3-pil
 
 Controls
@@ -29,7 +29,7 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..', '..')))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
+from packjack.compat import LCD_1in44
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads import _input_helper as _input_helper
@@ -63,8 +63,8 @@ FONT_SMALL_SIZE = int(9 * _S)
 FONT_BIG_SIZE = int(11 * _S)
 
 NAVARRO_PATHS = [
-    "/root/Raspyjack/Navarro/navarro.py",
-    "/home/raspyjack/Navarro/navarro.py",
+    "/root/Raspyjack/vendor/navarro/navarro.py",
+    "/home/raspyjack/vendor/navarro/navarro.py",
 ]
 NAVARRO_PATH = next((p for p in NAVARRO_PATHS if os.path.exists(p)), NAVARRO_PATHS[0])
 LOOT_BASE = "/root/Raspyjack/loot/OSINT"

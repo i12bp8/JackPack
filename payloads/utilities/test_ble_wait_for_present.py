@@ -14,7 +14,7 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
-from EXTENSIONS.api import REQUIRE_CAPABILITY, RUN_PAYLOAD, WAIT_FOR_PRESENT
+from extensions.api import REQUIRE_CAPABILITY, RUN_PAYLOAD, WAIT_FOR_PRESENT
 
 
 DEFAULT_NAME = "TestRJ"

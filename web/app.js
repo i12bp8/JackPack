@@ -91,6 +91,24 @@
   const payloadStatus = document.getElementById("payloadStatus");
   const payloadStatusDot = document.getElementById("payloadStatusDot");
   const payloadsRefresh = document.getElementById("payloadsRefresh");
+  const payloadsRefreshMain = document.getElementById("payloadsRefreshMain");
+  const payloadQuickGrid = document.getElementById("payloadQuickGrid");
+  const payloadSummary = document.getElementById("payloadSummary");
+  const payloadLogTail = document.getElementById("payloadLogTail");
+  const payloadLogRefresh = document.getElementById("payloadLogRefresh");
+  const payloadLogStatus = document.getElementById("payloadLogStatus");
+  const headlessMode = document.getElementById("headlessMode");
+  const headlessAp = document.getElementById("headlessAp");
+  const headlessAttack = document.getElementById("headlessAttack");
+  const activePayloadTitle = document.getElementById("activePayloadTitle");
+  const activePayloadMeta = document.getElementById("activePayloadMeta");
+  const activePayloadStop = document.getElementById("activePayloadStop");
+  const controlApValue = document.getElementById("controlApValue");
+  const controlApMeta = document.getElementById("controlApMeta");
+  const attackWifiValue = document.getElementById("attackWifiValue");
+  const attackWifiMeta = document.getElementById("attackWifiMeta");
+  const wiredValue = document.getElementById("wiredValue");
+  const wiredMeta = document.getElementById("wiredMeta");
   const settingsStatus = document.getElementById("settingsStatus");
   const discordWebhookInput = document.getElementById("discordWebhookInput");
   const discordWebhookSave = document.getElementById("discordWebhookSave");
@@ -615,6 +633,39 @@
     }
   }
 
+  function setPayloadLogStatus(txt) {
+    if (payloadLogStatus) {
+      payloadLogStatus.textContent = txt;
+      applyStatusTone(payloadLogStatus, txt);
+    }
+  }
+
+  function payloadLabel(path) {
+    const raw = String(path || "");
+    const base = raw.split("/").pop() || raw || "payload";
+    return base.replace(/\.py$/i, "").replace(/_/g, " ");
+  }
+
+  function setActivePayloadView(status) {
+    const running = !!(status && status.running);
+    const path = running ? status.path || "" : "";
+    if (activePayloadTitle) {
+      activePayloadTitle.textContent = running ? payloadLabel(path) : "None";
+    }
+    if (activePayloadMeta) {
+      if (!running) {
+        activePayloadMeta.textContent = "Ready";
+      } else if (status.started_at) {
+        activePayloadMeta.textContent = `${path} · ${formatDuration(Date.now() / 1000 - Number(status.started_at || 0))}`;
+      } else {
+        activePayloadMeta.textContent = path || "running";
+      }
+    }
+    if (activePayloadStop) {
+      activePayloadStop.classList.toggle("hidden", !running);
+    }
+  }
+
   function setSystemStatus(txt) {
     if (systemStatus) {
       systemStatus.textContent = txt;
@@ -973,7 +1024,7 @@
           fitAddon.fit();
         } catch {}
       }
-      term.write("RaspyJack shell ready.\\r\\n");
+      term.write("JackPack shell ready.\\r\\n");
     }
     return term;
   }
@@ -1115,7 +1166,7 @@
           sysInterfaces.innerHTML = ifaces
             .map(
               (i) =>
-                `<div><span class="text-emerald-300">${escapeHtml(String(i.name || "-"))}</span>: ${escapeHtml(String(i.ipv4 || "-"))}</div>`,
+                `<div><span class="text-emerald-300">${escapeHtml(String(i.name || "-"))}</span>: ${escapeHtml(String(i.ipv4 || "-"))} <span class="text-slate-500">${escapeHtml(String(i.role || "network"))}</span></div>`,
             )
             .join("");
         }
@@ -1124,6 +1175,49 @@
       setSystemStatus("Live");
     } catch (e) {
       setSystemStatus("Unavailable");
+    }
+  }
+
+  function ifaceByRole(ifaces, role, fallbackName) {
+    return (
+      (ifaces || []).find((item) => item.role === role) ||
+      (ifaces || []).find((item) => item.name === fallbackName) ||
+      null
+    );
+  }
+
+  async function loadHeadlessStatus() {
+    try {
+      const url = getApiUrl("/api/headless/status");
+      const res = await apiFetch(url, { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data && data.error ? data.error : "headless_failed");
+      const ifaces = Array.isArray(data.interfaces) ? data.interfaces : [];
+      const ap = data.ap || {};
+      const attack = data.attack || {};
+      const wired = ifaceByRole(ifaces, "wired_target", (data.wired && data.wired.iface) || "eth0");
+
+      if (headlessMode) {
+        headlessMode.textContent = data.headless ? "Headless runtime active" : "Classic runtime";
+      }
+      if (headlessAp) {
+        headlessAp.textContent = `${ap.ssid || "JackPack"} on ${ap.iface || "wlan0"}${ap.present ? "" : " missing"}`;
+      }
+      if (headlessAttack) {
+        headlessAttack.textContent = `${attack.iface || "wlan1"} ${attack.present ? "ready" : "not detected"}`;
+      }
+      if (controlApValue) controlApValue.textContent = `${ap.iface || "wlan0"} · ${ap.ssid || "JackPack"}`;
+      if (controlApMeta) {
+        const web = data.web || {};
+        controlApMeta.textContent = ap.present ? `Open ${web.url || "http://jackpack.local:8080"}` : "Interface not detected";
+      }
+      if (attackWifiValue) attackWifiValue.textContent = attack.iface || "wlan1";
+      if (attackWifiMeta) attackWifiMeta.textContent = attack.present ? "External adapter detected" : "Plug in a monitor-mode USB adapter";
+      if (wiredValue) wiredValue.textContent = wired ? `${wired.name} · ${wired.ipv4 || "-"}` : ((data.wired && data.wired.iface) || "eth0");
+      if (wiredMeta) wiredMeta.textContent = wired ? "Built-in Ethernet online" : "No wired address";
+      if (data.payload) setActivePayloadView(data.payload);
+    } catch (e) {
+      if (headlessMode) headlessMode.textContent = "Status unavailable";
     }
   }
 
@@ -1898,12 +1992,16 @@
         }
       });
       renderPayloadSidebar();
+      renderPayloadQuickGrid();
       setPayloadStatus("Ready");
     } catch (e) {
       setPayloadStatus("Failed to load");
       if (payloadSidebar)
         payloadSidebar.innerHTML =
           '<div class="text-xs text-slate-500 px-2">No payloads available.</div>';
+      if (payloadQuickGrid)
+        payloadQuickGrid.innerHTML =
+          '<div class="text-xs text-slate-500">No payloads available.</div>';
     }
   }
 
@@ -1960,6 +2058,48 @@
       .join("");
   }
 
+  function renderPayloadQuickGrid() {
+    if (!payloadQuickGrid) return;
+    const cats = payloadState.categories || [];
+    const items = [];
+    cats.forEach((cat) => {
+      (cat.items || []).forEach((item) => {
+        items.push({ ...item, category: cat.label || cat.id || "Payloads" });
+      });
+    });
+    if (payloadSummary) {
+      payloadSummary.textContent = `${items.length} payloads across ${cats.length} categories`;
+    }
+    if (!items.length) {
+      payloadQuickGrid.innerHTML = '<div class="text-xs text-slate-500">No payloads available.</div>';
+      return;
+    }
+    payloadQuickGrid.innerHTML = items
+      .slice(0, 72)
+      .map((item) => {
+        const itemPath = String(item.path || "");
+        const encoded = encodeData(itemPath);
+        const meta = item.meta || {};
+        const tags = Array.isArray(meta.tags) && meta.tags.length ? meta.tags : [String(item.category || "payload")];
+        const disabled = !!payloadState.activePath;
+        const isActive = payloadState.activePath === itemPath;
+        const action = isActive
+          ? '<button type="button" data-stop="1" class="mt-3 px-3 py-1.5 text-xs rounded-lg bg-rose-600/80 border border-rose-300/30 text-white hover:bg-rose-500/80 transition">Stop</button>'
+          : `<button type="button" data-start="${encoded}" ${disabled ? "disabled" : ""} class="mt-3 px-3 py-1.5 text-xs rounded-lg ${disabled ? "bg-slate-800/80 border border-slate-700/50 text-slate-500 cursor-not-allowed" : "bg-emerald-600/80 border border-emerald-300/30 text-white hover:bg-emerald-500/80 transition"}">Start</button>`;
+        return `
+          <div class="jp-payload-card">
+            <div>
+              <div class="jp-payload-name">${escapeHtml(payloadLabel(itemPath))}</div>
+              <div class="jp-payload-path">${escapeHtml(itemPath)}</div>
+              <div class="jp-tag-row">${tags.slice(0, 4).map((tag) => `<span class="jp-tag">${escapeHtml(String(tag))}</span>`).join("")}</div>
+            </div>
+            ${action}
+          </div>
+        `;
+      })
+      .join("");
+  }
+
   async function startPayload(path) {
     setPayloadStatus("Starting...");
     try {
@@ -1975,9 +2115,31 @@
       }
       payloadState.activePath = path;
       renderPayloadSidebar();
+      renderPayloadQuickGrid();
       setPayloadStatus("Launched");
+      loadPayloadLog();
     } catch (e) {
       setPayloadStatus("Start failed");
+    }
+  }
+
+  async function stopPayload() {
+    setPayloadStatus("Stopping...");
+    try {
+      const url = getApiUrl("/api/payloads/stop");
+      const res = await apiFetch(url, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data && data.error ? data.error : "stop_failed");
+      }
+      payloadState.activePath = null;
+      renderPayloadSidebar();
+      renderPayloadQuickGrid();
+      setPayloadStatus("Ready");
+      loadPayloadLog();
+    } catch (e) {
+      tapInput("KEY3");
+      setPayloadStatus("Stop requested");
     }
   }
 
@@ -1994,10 +2156,29 @@
       if (payloadState.activePath !== path) {
         payloadState.activePath = path;
         renderPayloadSidebar();
+        renderPayloadQuickGrid();
       }
       setPayloadStatus(running ? "Running" : "Ready");
+      setActivePayloadView(data);
     } catch (e) {
       setPayloadStatus("Ready");
+    }
+  }
+
+  async function loadPayloadLog() {
+    if (!payloadLogTail) return;
+    setPayloadLogStatus("Loading...");
+    try {
+      const url = getApiUrl("/api/payloads/log", { bytes: "65536" });
+      const res = await apiFetch(url, { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data && data.error ? data.error : "log_failed");
+      const text = String(data.text || "").trim();
+      payloadLogTail.textContent = text || "No log output yet.";
+      setPayloadLogStatus(data.exists ? "Live tail" : "No log yet");
+    } catch (e) {
+      payloadLogTail.textContent = "Unable to read payload log.";
+      setPayloadLogStatus("Unavailable");
     }
   }
 
@@ -2201,12 +2382,29 @@
       }
       const stopBtn = e.target.closest("[data-stop]");
       if (stopBtn) {
-        setPayloadStatus("Stopping...");
-        tapInput("KEY3");
+        stopPayload();
       }
     });
   if (payloadsRefresh)
     payloadsRefresh.addEventListener("click", () => loadPayloads());
+  if (payloadsRefreshMain)
+    payloadsRefreshMain.addEventListener("click", () => loadPayloads());
+  if (payloadQuickGrid)
+    payloadQuickGrid.addEventListener("click", (e) => {
+      const startBtn = e.target.closest("[data-start]");
+      if (startBtn) {
+        const encodedPath = startBtn.getAttribute("data-start") || "";
+        const path = decodeURIComponent(encodedPath);
+        if (path) startPayload(path);
+        return;
+      }
+      const stopBtn = e.target.closest("[data-stop]");
+      if (stopBtn) stopPayload();
+    });
+  if (payloadLogRefresh)
+    payloadLogRefresh.addEventListener("click", () => loadPayloadLog());
+  if (activePayloadStop)
+    activePayloadStop.addEventListener("click", () => stopPayload());
   if (discordWebhookSave)
     discordWebhookSave.addEventListener("click", () => {
       saveDiscordWebhook(discordWebhookInput ? discordWebhookInput.value : "");
@@ -2321,6 +2519,7 @@
     const delay = document.hidden ? 6000 : 1500;
     payloadPollTimer = setTimeout(async () => {
       await pollPayloadStatus();
+      await loadHeadlessStatus();
       schedulePayloadPoll();
     }, delay);
   }
@@ -2340,19 +2539,23 @@
     if (!document.hidden) {
       if (systemOpen) loadSystemStatus();
       pollPayloadStatus();
+      loadHeadlessStatus();
+      loadPayloadLog();
     }
     schedulePayloadPoll();
     scheduleSystemPoll();
   });
 
   const startAfterAuth = () => {
-    ensureAuthenticated("Log in to access RaspyJack WebUI.").then((ok) => {
+    ensureAuthenticated("Log in to access JackPack.").then((ok) => {
       if (!ok) {
         setTimeout(startAfterAuth, 0);
         return;
       }
       connect();
       loadPayloads();
+      loadHeadlessStatus();
+      loadPayloadLog();
       schedulePayloadPoll();
       scheduleSystemPoll();
     });
@@ -2375,9 +2578,9 @@
       });
       if (_sizeLabel) _sizeLabel.textContent = "x" + scale.toFixed(1);
       // Layout: device on top, terminal below
-      const wrapper = document.querySelector("#deviceTab > div");
+      const wrapper = document.querySelector("#compatDeviceLayout");
       const deviceDiv = document.querySelector(
-        "#deviceTab > div > div:last-child",
+        "#compatDeviceLayout > div:last-child",
       );
       if (wrapper && deviceDiv) {
         wrapper.className = "flex flex-col items-center gap-6";

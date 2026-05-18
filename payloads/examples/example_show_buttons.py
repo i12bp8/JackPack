@@ -38,7 +38,7 @@ import sys            # print exceptions to stderr
 # These come pre‑installed on RaspyJack; on a vanilla Pi OS you’d need:
 #   sudo apt install python3-pil python3-rpi.gpio
 import RPi.GPIO as GPIO               # Raspberry Pi GPIO access
-import LCD_1in44, LCD_Config          # Waveshare driver helpers for the LCD
+from packjack.compat import LCD_1in44, LCD_Config          # Waveshare driver helpers for the LCD
 from PIL import Image, ImageDraw, ImageFont  # Pillow – draw text on images
 
 # Shared input helper (WebUI virtual + GPIO)

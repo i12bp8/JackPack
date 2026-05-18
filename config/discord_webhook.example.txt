@@ -1,0 +1,3 @@
+# Optional Discord webhook URL for payload notifications.
+# Copy to /root/JackPack/discord_webhook.txt on the device if you want this.
+

@@ -12,7 +12,7 @@ broadcasts all traffic (hub mode), enabling passive sniffing.
 Controls:
   OK         -- Start / Stop flooding
   UP / DOWN  -- Adjust speed (packets per burst)
-  KEY1       -- Toggle interface (eth0 / wlan0)
+  KEY1       -- Toggle interface (eth0 / wlan1)
   KEY3       -- Exit
 
 Setup: No special requirements, uses scapy raw frames.
@@ -29,7 +29,7 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44, LCD_Config
+from packjack.compat import LCD_1in44, LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button

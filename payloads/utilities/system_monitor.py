@@ -30,8 +30,8 @@ from collections import deque
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -52,7 +52,7 @@ font = scaled_font()
 VIEWS = ["Dashboard", "CPU Graph", "Network", "Net Info"]
 REFRESH_INTERVAL = 2.0
 DEBOUNCE = 0.20
-SERVICES = ["raspyjack", "raspyjack-device", "raspyjack-webui", "caddy"]
+SERVICES = ["packjack-ap", "packjack-web", "packjack-ws", "packjack-pin-wifi"]
 
 lock = threading.Lock()
 _running = True
@@ -217,10 +217,11 @@ def _read_iface_ips():
 
 
 def _read_wifi_signal():
-    """Return WiFi signal level string from iw dev wlan0 link, or None."""
+    """Return WiFi signal level string from the payload WiFi adapter, or None."""
+    iface = os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1"))
     try:
         out = subprocess.run(
-            ["iw", "dev", "wlan0", "link"],
+            ["iw", "dev", iface, "link"],
             capture_output=True, text=True, timeout=3,
         )
         for line in out.stdout.splitlines():

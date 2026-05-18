@@ -31,8 +31,8 @@ from urllib.parse import parse_qs
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -99,7 +99,7 @@ local_ip = "0.0.0.0"
 
 def _get_local_ip():
     """Detect the local IP address."""
-    for candidate in ["eth0", "wlan0"]:
+    for candidate in ["eth0", "wlan1"]:
         try:
             r = subprocess.run(["ip", "-4", "addr", "show", candidate],
                                capture_output=True, text=True, timeout=5)

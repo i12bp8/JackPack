@@ -39,7 +39,7 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44, LCD_Config
+from packjack.compat import LCD_1in44, LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -199,7 +199,7 @@ def _find_wifi_dongle():
             return ifaces[0]
     except Exception:
         pass
-    return "wlan1"
+    return os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1"))
 
 
 def _enable_monitor(iface):

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RaspyJack Payload IDE</title>
+  <title>JackPack Payload IDE</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
@@ -315,7 +315,7 @@
     <!-- Header -->
     <header class="flex items-center justify-between px-4 py-2 border-b border-slate-800/70 bg-slate-950/60 backdrop-blur scanlines relative overflow-hidden">
       <div class="flex items-center gap-3 relative z-10">
-        <img src="./raspyjack.png" alt="RaspyJack" class="h-8 drop-shadow-[0_0_12px_rgba(18,255,120,0.35)]"/>
+        <img src="./jackpack.png" alt="JackPack" class="h-8 drop-shadow-[0_0_12px_rgba(18,255,120,0.35)]"/>
         <div>
           <div class="text-sm font-black tracking-wide text-glow"><span class="text-emerald-400">R</span>ASPY<span class="text-rose-400">J</span>ACK</div>
           <div class="text-[10px] text-slate-400">IDE STUDIO</div>
@@ -578,15 +578,15 @@
     <div class="max-w-sm mx-auto mt-24 px-4">
       <div class="rounded-2xl border border-slate-700/60 bg-slate-950/95 shadow-[0_0_30px_rgba(15,23,42,0.75)] overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-800/70 flex items-center justify-between">
-          <div class="text-sm font-semibold text-emerald-300">Restart RaspyJack UI</div>
+          <div class="text-sm font-semibold text-emerald-300">Restart JackPack UI</div>
           <button id="restartUiModalClose" class="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded-md bg-slate-900/60 border border-slate-700/60">✕</button>
         </div>
         <div class="px-4 py-3 space-y-2 text-xs">
           <div class="text-slate-300">
-            Restart RaspyJack UI now?
+            Restart JackPack UI now?
           </div>
           <div class="text-slate-400 text-[11px]">
-            This restarts the on-device UI process and may briefly interrupt screen updates.
+            This restarts the on-device WebUI process and may briefly interrupt the browser connection.
           </div>
           <div id="restartUiModalError" class="hidden text-[11px] text-rose-300"></div>
         </div>
@@ -734,7 +734,7 @@
         <!-- Info banner -->
         <div class="p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/15 flex items-start gap-2">
           <i class="fa-solid fa-circle-info text-emerald-400 mt-0.5 text-xs"></i>
-          <span class="text-[10px] text-slate-400">RaspyJack uses BCM (Broadcom) pin numbering with active-LOW buttons (pressed = 0).</span>
+          <span class="text-[10px] text-slate-400">Legacy compat payloads use BCM (Broadcom) pin numbering with active-LOW buttons (pressed = 0).</span>
         </div>
         <!-- Pin Mappings section -->
         <div>
@@ -808,22 +808,22 @@ finally:
             </div>
           </div>
         </div>
-        <!-- LCD Display section -->
+        <!-- Headless compatibility section -->
         <div>
           <div class="gpio-section-header" data-gpio-section="lcd">
             <i class="fa-solid fa-chevron-right text-slate-400 text-[10px] gpio-chevron"></i>
-            <span class="text-xs font-medium text-slate-200">LCD Display</span>
+            <span class="text-xs font-medium text-slate-200">Compat Display</span>
           </div>
           <div class="gpio-section-body hidden mt-2" data-gpio-body="lcd">
             <div class="p-2 rounded-lg bg-slate-800/30 border border-slate-800/70">
               <div class="grid grid-cols-2 gap-2 text-[10px]">
-                <div><span class="text-slate-400">Type:</span> <span class="font-mono">1.44" TFT</span></div>
-                <div><span class="text-slate-400">Resolution:</span> <span class="font-mono">128x128</span></div>
-                <div><span class="text-slate-400">Driver:</span> <span class="font-mono">LCD_1in44</span></div>
-                <div><span class="text-slate-400">Interface:</span> <span class="font-mono">SPI</span></div>
+                <div><span class="text-slate-400">Mode:</span> <span class="font-mono">headless</span></div>
+                <div><span class="text-slate-400">Output:</span> <span class="font-mono">logs/API</span></div>
+                <div><span class="text-slate-400">Compat:</span> <span class="font-mono">packjack.compat</span></div>
+                <div><span class="text-slate-400">Target:</span> <span class="font-mono">Pi 5</span></div>
               </div>
             </div>
-            <p class="text-[10px] text-slate-400 mt-1">Uses Waveshare 1.44inch LCD HAT with ST7735S controller. Supports RGB565 color format via PIL/Pillow.</p>
+            <p class="text-[10px] text-slate-400 mt-1">New payloads should expose status through logs, loot files, and APIs. LCD helpers only live under the compatibility package for upstream ports.</p>
           </div>
         </div>
       </div>
@@ -836,4 +836,3 @@ finally:
   <script src="./ide.js"></script>
 </body>
 </html>
-

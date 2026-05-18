@@ -31,8 +31,8 @@ from collections import defaultdict, deque
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -332,7 +332,7 @@ def main():
 
     # Auto-detect interface
     iface = "eth0"
-    for candidate in ["eth0", "eth1", "wlan0"]:
+    for candidate in ["eth0", "eth1", "wlan1"]:
         try:
             r = subprocess.run(["ip", "link", "show", candidate],
                                capture_output=True, timeout=3)

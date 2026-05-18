@@ -15,7 +15,7 @@ import os, sys, json
 from PIL import ImageDraw, ImageFont
 
 # ---------------------------------------------------------------------------
-# Detect scale factor (same logic as LCD_1in44.py)
+# Detect scale factor from the JackPack LCD compatibility shim.
 # ---------------------------------------------------------------------------
 _DISPLAY_TYPE = "ST7735_128"
 _CONF_PATHS = [
@@ -33,7 +33,7 @@ for _p in _CONF_PATHS:
         break
 
 try:
-    import LCD_1in44
+    from packjack.compat import LCD_1in44
     _LCD_W = LCD_1in44.LCD_WIDTH
     _LCD_H = LCD_1in44.LCD_HEIGHT
 except Exception:

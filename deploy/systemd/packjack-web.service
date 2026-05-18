@@ -1,0 +1,16 @@
+[Unit]
+Description=JackPack headless WebUI
+After=network-online.target packjack-ap.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/JackPack
+EnvironmentFile=-/etc/packjack/packjack.env
+Environment=RJ_HEADLESS=1
+ExecStart=/usr/bin/python3 /root/JackPack/web_server.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

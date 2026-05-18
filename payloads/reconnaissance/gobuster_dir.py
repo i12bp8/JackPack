@@ -4,7 +4,7 @@ RaspyJack Payload -- Gobuster (dir mode)
 =========================================
 Author: MerlinvdW
 
-Runs gobuster dir against a URL. Wordlists: install_raspyjack.sh fills
+Runs gobuster dir against a URL. JackPack installs bundled wordlists into
 loot/wordlists and loot/wordlists/dirbuster (with /usr/share fallbacks).
 
 Authorized testing only; generates many HTTP requests.
@@ -38,8 +38,8 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -366,7 +366,7 @@ def _run_gobuster_missing_loop() -> None:
     try:
         while True:
             _draw_error(
-                "gobuster not found|apt install gobuster|or re-run install_raspyjack.sh"
+                "gobuster not found|apt install gobuster|or re-run JackPack installer"
             )
             if get_button(PINS, GPIO) == "KEY3":
                 break
@@ -455,7 +455,7 @@ def main() -> None:
                 elif btn == "OK":
                     resolved, _ = _wordlist_resolve(wl_preset)
                     if not resolved:
-                        _draw_error("No wordlist|run install_raspyjack.sh")
+                        _draw_error("No wordlist|run JackPack installer")
                         time.sleep(ERROR_SCREEN_PAUSE_S)
                         continue
                     if not _validate_url(url):

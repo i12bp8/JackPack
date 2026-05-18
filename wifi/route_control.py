@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-RaspyJack Route Control - Command Line Interface
-================================================
+JackPack Route Control - Command Line Interface
+===============================================
 Command-line tool to demonstrate how interface selection
 actually controls system routing.
 
@@ -15,9 +15,22 @@ Usage:
 
 import sys
 import os
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+WIFI_DIR = ROOT_DIR / "wifi"
+
+try:
+    from packjack import interfaces as jp_ifaces
+except Exception:
+    jp_ifaces = None
+
+
+def _control_iface():
+    return jp_ifaces.ap_iface() if jp_ifaces else os.environ.get("JACKPACK_AP_IFACE", "wlan0")
 
 # Add required paths
-sys.path.append('/root/Raspyjack/wifi/')
+sys.path.append(str(WIFI_DIR))
 
 try:
     from raspyjack_integration import (
@@ -37,7 +50,7 @@ except Exception as e:
 
 def show_usage():
     """Show usage information."""
-    print("RaspyJack Route Control")
+    print("JackPack Route Control")
     print("="*30)
     print("USAGE:")
     print("  python3 route_control.py status                # Show routing status")
@@ -50,7 +63,7 @@ def show_usage():
     print("EXAMPLES:")
     print("  python3 route_control.py switch wlan1          # Make wlan1 default")
     print("  python3 route_control.py switch eth0           # Switch back to ethernet")
-    print("  python3 route_control.py test wlan0            # Check wlan0 status")
+    print("  python3 route_control.py test wlan1            # Check payload WiFi status")
 
 def cmd_status():
     """Show current routing status."""
@@ -101,6 +114,11 @@ def cmd_switch(interface):
     
     # Check if interface exists
     available = get_available_interfaces()
+    control_iface = _control_iface()
+    if interface == control_iface:
+        print(f"❌ Refusing to switch the control AP interface ({control_iface}).")
+        print("Use the Pi 5 Ethernet port or payload WiFi adapter instead.")
+        return False
     if interface not in available:
         print(f"❌ Interface {interface} not found!")
         print(f"Available interfaces: {', '.join(available)}")
@@ -209,7 +227,7 @@ def main():
     """Main function."""
     if not IMPORTS_OK:
         print("❌ Required modules not available")
-        print("Make sure you're running from RaspyJack directory")
+        print("Make sure you're running from the JackPack directory")
         return 1
     
     if len(sys.argv) < 2:

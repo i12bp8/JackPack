@@ -29,7 +29,7 @@ sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..', '..')))
 
 # ---------------------------- Third‑party libs ----------------------------
 import RPi.GPIO as GPIO               # Raspberry Pi GPIO access
-import LCD_1in44                      # Waveshare LCD driver
+from packjack.compat import LCD_1in44                      # Waveshare LCD driver
 from PIL import Image, ImageDraw, ImageFont  # Pillow – draw text
 from payloads._display_helper import ScaledDraw, scaled_font
 

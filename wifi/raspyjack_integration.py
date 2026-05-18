@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-RaspyJack WiFi Integration Functions
+JackPack WiFi Integration Functions
 ===================================
-Integration functions to add WiFi support to RaspyJack's main system
+Integration functions for JackPack's Pi 5 network policy
 
 This module provides:
 - Interface selection for network tools
@@ -10,7 +10,7 @@ This module provides:
 - WiFi-aware network functions
 - Seamless eth0/WiFi switching
 
-Usage in raspyjack.py:
+Usage in JackPack payloads:
     from wifi.raspyjack_integration import get_best_interface, get_interface_ip
     
     interface = get_best_interface()
@@ -24,9 +24,31 @@ import json
 import traceback
 import time
 from datetime import datetime
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+WIFI_DIR = Path(os.environ.get("JACKPACK_WIFI_DIR", str(ROOT_DIR / "wifi")))
+LOOT_ROOT = Path(os.environ.get("JACKPACK_LOOT_DIR", str(ROOT_DIR / "loot")))
+
+try:
+    from packjack import interfaces as jp_ifaces
+except Exception:
+    jp_ifaces = None
+
+
+def _ap_iface():
+    return jp_ifaces.ap_iface() if jp_ifaces else os.environ.get("JACKPACK_AP_IFACE", "wlan0")
+
+
+def _attack_iface():
+    return jp_ifaces.attack_wifi_iface() if jp_ifaces else os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1"))
+
+
+def _wired_iface():
+    return jp_ifaces.wired_iface() if jp_ifaces else os.environ.get("JACKPACK_WIRED_IFACE", "eth0")
 
 # Add WiFi manager to path
-sys.path.append('/root/Raspyjack/wifi/')
+sys.path.append(str(WIFI_DIR))
 
 try:
     from wifi_manager import WiFiManager
@@ -35,7 +57,7 @@ except Exception as e:
     print(f"WiFi manager not available: {e}")
     wifi_manager = None
 
-BOOT_LOG_FILE = "/root/Raspyjack/loot/network/interface_boot_log.txt"
+BOOT_LOG_FILE = str(LOOT_ROOT / "network" / "interface_boot_log.txt")
 
 
 def _safe_read(path):
@@ -213,7 +235,7 @@ def get_best_interface(prefer_wifi=False, bypass_checks=False):
             # Clear bad preference
             try:
                 import os
-                pref_file = "/root/Raspyjack/wifi/interface_preferences.json"
+                pref_file = str(WIFI_DIR / "interface_preferences.json")
                 if os.path.exists(pref_file):
                     os.remove(pref_file)
             except Exception:
@@ -251,14 +273,17 @@ def get_best_interface(prefer_wifi=False, bypass_checks=False):
     
     # Priority logic
     if prefer_wifi:
-        # Prefer WiFi if requested - prioritize wlan0 (WebUI/connectivity interface)
+        # Prefer the payload WiFi adapter. The control AP interface is reserved.
         wifi_interfaces = [iface for iface in connected_interfaces if iface.startswith('wlan')]
         if wifi_interfaces:
-            wifi_interfaces.sort(key=lambda x: (x != 'wlan0', x != 'wlan1', x))
+            control_iface = _ap_iface()
+            attack_iface = _attack_iface()
+            wifi_interfaces = [iface for iface in wifi_interfaces if iface != control_iface] or wifi_interfaces
+            wifi_interfaces.sort(key=lambda x: (x != attack_iface, x == control_iface, x))
             return wifi_interfaces[0]
     
-    # Default priority: eth0 > wlan0 (WebUI) > external dongles
-    priority_order = ['eth0', 'wlan0', 'wlan1', 'wlan2', 'wlan3']
+    # Default JackPack priority: Pi 5 Ethernet, then payload WiFi. Control AP last.
+    priority_order = [_wired_iface(), _attack_iface(), 'wlan2', 'wlan3', _ap_iface()]
     
     for preferred in priority_order:
         if preferred in connected_interfaces:
@@ -347,7 +372,7 @@ def create_interface_command(base_command, interface, target=None):
 def show_interface_info():
     """Show information about all available interfaces."""
     print("\n" + "="*50)
-    print("RaspyJack Network Interface Status")
+    print("JackPack Network Interface Status")
     print("="*50)
     
     interfaces = get_available_interfaces()
@@ -395,7 +420,7 @@ def setup_tool_interface(tool_name, interface=None):
     
     return interface
 
-# Integration functions for specific RaspyJack features
+# Integration functions for specific JackPack features
 def get_nmap_target_network(interface=None):
     """Get target network for nmap scanning."""
     if interface is None:
@@ -438,7 +463,7 @@ def get_dns_spoof_ip(interface=None):
 # Configuration management
 def save_interface_preference(tool, interface):
     """Save interface preference for a tool."""
-    config_file = "/root/Raspyjack/wifi/interface_preferences.json"
+    config_file = str(WIFI_DIR / "interface_preferences.json")
     
     try:
         if os.path.exists(config_file):
@@ -462,7 +487,7 @@ def save_interface_preference(tool, interface):
 
 def get_interface_preference(tool):
     """Get saved interface preference for a tool."""
-    config_file = "/root/Raspyjack/wifi/interface_preferences.json"
+    config_file = str(WIFI_DIR / "interface_preferences.json")
     
     try:
         if os.path.exists(config_file):
@@ -509,7 +534,7 @@ def get_current_default_route():
 
 def backup_routing_config():
     """Backup current routing configuration."""
-    backup_file = "/root/Raspyjack/wifi/routing_backup.json"
+    backup_file = str(WIFI_DIR / "routing_backup.json")
     
     try:
         # Get all routes
@@ -527,7 +552,7 @@ def backup_routing_config():
         }
         
         # Backup interface configurations
-        for interface in ["eth0", "wlan0", "wlan1", "wlan2"]:
+        for interface in [_wired_iface(), _ap_iface(), _attack_iface(), "wlan2"]:
             try:
                 iface_info = subprocess.run(['ip', 'addr', 'show', interface], 
                                           capture_output=True, text=True, check=False)
@@ -631,7 +656,7 @@ def update_dns_for_interface(interface):
         
         if dns_servers:
             # Update /etc/resolv.conf
-            resolv_content = "# Generated by RaspyJack WiFi Integration\n"
+            resolv_content = "# Generated by JackPack WiFi Integration\n"
             for dns in dns_servers:
                 resolv_content += f"nameserver {dns}\n"
             
@@ -648,7 +673,7 @@ def update_dns_for_interface(interface):
 
 def restore_routing_from_backup():
     """Restore routing configuration from backup."""
-    backup_file = "/root/Raspyjack/wifi/routing_backup.json"
+    backup_file = str(WIFI_DIR / "routing_backup.json")
     
     if not os.path.exists(backup_file):
         print("❌ No routing backup found")
@@ -830,7 +855,7 @@ def force_interface_as_default(interface):
         print(f"🌐 Step 7: Updating DNS...")
         try:
             with open('/etc/resolv.conf', 'w') as f:
-                f.write(f"# RaspyJack forced DNS for {interface} - {datetime.now()}\n")
+                f.write(f"# JackPack forced DNS for {interface} - {datetime.now()}\n")
                 f.write(f"nameserver {gateway}\n")
                 f.write("nameserver 8.8.8.8\n")
                 f.write("nameserver 8.8.4.4\n")
@@ -971,17 +996,17 @@ def select_and_activate_interface(interface=None, interactive=False):
     success = ensure_interface_default(interface)
     
     if success:
-        # Save as preferred interface for RaspyJack
+        # Save as preferred interface for JackPack
         save_interface_preference("system_preferred", interface)
         print(f"\n✅ {interface} is now the primary network interface!")
         print("   All network traffic will use this interface.")
-        print("   RaspyJack will remember this preference.")
+        print("   JackPack will remember this preference.")
         return True
     else:
         print(f"\n❌ Failed to activate {interface}")
         return False
 
-def auto_connect_to_same_network(target_interface, source_interface="wlan0", lcd_callback=None):
+def auto_connect_to_same_network(target_interface, source_interface="wlan1", lcd_callback=None):
     """PROFILE-BASED: Auto-connect target interface using WiFi profiles."""
     def lcd_update(msg):
         """Send short message to LCD if callback provided."""
@@ -1038,7 +1063,7 @@ def auto_connect_to_same_network(target_interface, source_interface="wlan0", lcd
         
         # STEP 2: Load WiFi profiles and find matching SSID
         print(f"🗂️  STEP 2: Loading WiFi profiles for SSID: {current_ssid}")
-        profiles_dir = "/root/Raspyjack/wifi/profiles"
+        profiles_dir = str(WIFI_DIR / "profiles")
         
         if not os.path.exists(profiles_dir):
             print(f"❌ Profiles directory not found: {profiles_dir}")
@@ -1262,13 +1287,13 @@ def create_and_connect_profile(target_interface, ssid, lcd_callback=None):
     return try_connect_without_profile(target_interface, ssid, lcd_callback)
 
 def set_raspyjack_interface(interface, lcd_callback=None):
-    """Explicitly set which interface RaspyJack tools should use - IMMEDIATE."""
+    """Explicitly set which interface JackPack tools should use - IMMEDIATE."""
     def lcd_update(msg):
         """Send short message to LCD if callback provided."""
         if lcd_callback:
             lcd_callback(msg)
     
-    print(f"🔄 IMMEDIATELY setting RaspyJack to use: {interface}")
+    print(f"🔄 IMMEDIATELY setting JackPack to use: {interface}")
     lcd_update(f"Setting {interface}...")
     
     # STEP 1: Check if interface exists
@@ -1353,13 +1378,13 @@ def set_raspyjack_interface(interface, lcd_callback=None):
             lcd_update("Reconnecting...")
             
             # Determine source interface for network info
-            if interface == 'wlan0':
-                # When switching TO wlan0, use wlan1 as source if available
-                source_interface = 'wlan1'
+            control_iface = _ap_iface()
+            attack_iface = _attack_iface()
+            if interface == control_iface:
+                source_interface = attack_iface
                 print(f"   Using {source_interface} as source for network info")
             else:
-                # When switching TO wlan1, use wlan0 as source
-                source_interface = 'wlan0'
+                source_interface = control_iface
                 print(f"   Using {source_interface} as source for network info")
             
             if not auto_connect_to_same_network(interface, source_interface, lcd_callback):
@@ -1408,7 +1433,7 @@ def set_raspyjack_interface(interface, lcd_callback=None):
         # Save as the preferred interface immediately
         save_interface_preference("system_preferred", interface)
         
-        print(f"✅ RaspyJack IMMEDIATELY switched to {interface}")
+        print(f"✅ JackPack IMMEDIATELY switched to {interface}")
         print(f"   IP: {interface_ip}")
         print(f"   🎯 All nmap scans will use {interface}")
         print(f"   🕸️  All MITM attacks will use {interface}")
@@ -1425,7 +1450,7 @@ def set_raspyjack_interface(interface, lcd_callback=None):
         
         return True
     else:
-        print(f"❌ FAILED to switch RaspyJack to {interface}")
+        print(f"❌ FAILED to switch JackPack to {interface}")
         lcd_update("FAILED!")
         return False
 
@@ -1449,7 +1474,7 @@ def switch_wifi_interface(from_interface, to_interface):
         return False
 
 def get_current_raspyjack_interface():
-    """Get the interface currently being used by RaspyJack."""
+    """Get the interface currently being used by JackPack."""
     # Check user preference first
     preferred = get_interface_preference("system_preferred")
     if preferred:
@@ -1501,7 +1526,7 @@ def list_wifi_interfaces_with_status():
 # Main function for testing
 def main():
     """Test the integration functions."""
-    print("RaspyJack WiFi Integration Test")
+    print("JackPack WiFi Integration Test")
     print("="*40)
     
     show_interface_info()

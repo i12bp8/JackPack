@@ -41,8 +41,8 @@ from collections import Counter, deque
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 import math
 import urllib.request
 from io import BytesIO
@@ -2232,22 +2232,23 @@ def main():
                                         t.start()
                                         threads.append(t)
 
-                    # Always start iw scan on wlan0 (works with or without USB cards)
-                    if os.path.isdir("/sys/class/net/wlan0/wireless"):
-                        card_state["wlan0"] = {
+                    # Always start iw scan on the JackPack payload WiFi adapter.
+                    scan_iface = os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1"))
+                    if os.path.isdir(f"/sys/class/net/{scan_iface}/wireless"):
+                        card_state[scan_iface] = {
                             "channel": 0, "channels": [], "band": "iw scan",
-                            "driver": "brcmfmac", "packets": 0, "5g": False,
+                            "driver": _driver_of(scan_iface), "packets": 0, "5g": False,
                         }
                         t = threading.Thread(target=_iw_scanner,
-                                             args=("wlan0",), daemon=True)
+                                             args=(scan_iface,), daemon=True)
                         t.start()
                         threads.append(t)
 
                     if not mon_ifaces:
-                        # No USB cards — scan-only mode with wlan0
+                        # No monitor card: scan-only mode with the payload WiFi adapter.
                         img = Image.new("RGB", (WIDTH, HEIGHT), "black")
                         d = ScaledDraw(img)
-                        d.text((4, 35), "Scan mode (wlan0)", font=font, fill="#FFAA00")
+                        d.text((4, 35), f"Scan mode ({scan_iface})", font=font, fill="#FFAA00")
                         d.text((4, 55), "No monitor card", font=font_sm, fill="#888")
                         d.text((4, 70), "Using iw scan", font=font_sm, fill="#888")
                         lcd.LCD_ShowImage(img, 0, 0)

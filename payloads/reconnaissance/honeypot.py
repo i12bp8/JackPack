@@ -77,7 +77,7 @@ HAS_LCD = False
 LCD_IMPORT_ERR: Optional[str] = None
 try:
     import RPi.GPIO as GPIO
-    import LCD_1in44, LCD_Config
+    from packjack.compat import LCD_1in44, LCD_Config
     from PIL import Image, ImageDraw, ImageFont
     from payloads._display_helper import ScaledDraw, scaled_font
     HAS_LCD = True
@@ -590,7 +590,9 @@ ROGUE_SCAN_INTERVAL = 30
 class RogueAPScanner:
     """Periodically scans Wi-Fi and detects potential rogue access points."""
 
-    def __init__(self, interface: str = "wlan0", debug_fn: Optional[Callable] = None):
+    def __init__(self, interface: str | None = None, debug_fn: Optional[Callable] = None):
+        if interface is None:
+            interface = os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1"))
         self.interface = interface
         self._debug = debug_fn or (lambda _: None)
         self._baseline: Optional[Dict[str, Set[str]]] = None  # SSID -> set of BSSIDs
@@ -1061,5 +1063,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
 

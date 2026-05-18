@@ -45,7 +45,7 @@ from urllib.parse import parse_qs
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44, LCD_Config
+from packjack.compat import LCD_1in44, LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -279,7 +279,7 @@ border-radius:4px;cursor:pointer;font-size:15px}
 <button type="submit">Connect</button>
 </form></div></body></html>"""
 
-PORTAL_SITES_DIR = "/root/Raspyjack/DNSSpoof/sites"
+PORTAL_SITES_DIR = "/root/JackPack/config/portal_sites"
 selected_portal_path = None  # None = use built-in default
 
 

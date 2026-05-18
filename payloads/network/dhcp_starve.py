@@ -27,8 +27,8 @@ import subprocess
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -72,7 +72,7 @@ target_subnet = "detecting..."
 
 def _detect_interface():
     """Find a suitable network interface (eth0 preferred, then wlan0)."""
-    for candidate in ["eth0", "wlan0"]:
+    for candidate in ["eth0", "wlan1"]:
         try:
             state_path = f"/sys/class/net/{candidate}/operstate"
             if os.path.exists(state_path):

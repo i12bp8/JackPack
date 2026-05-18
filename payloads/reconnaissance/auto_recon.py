@@ -11,7 +11,7 @@ Setup / Prerequisites:
     for auto-exfil of results.
 
 Sequence:
-  1. Detect active network interface (eth0 preferred, fallback wlan0)
+  1. Detect active network interface (eth0 preferred, fallback wlan1)
   2. ARP scan local subnet via scapy
   3. Quick nmap scan (-T4 --top-ports 100) on all discovered hosts
   4. Collect results: IPs, MACs, open ports, OS hints
@@ -36,8 +36,8 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -60,7 +60,12 @@ font = scaled_font()
 # ---------------------------------------------------------------------------
 LOOT_DIR = "/root/Raspyjack/loot/AutoRecon"
 WEBHOOK_PATH = "/root/Raspyjack/discord_webhook.txt"
-INTERFACES_PREFERRED = ["eth0", "eth1", "usb0", "wlan0", "wlan1"]
+INTERFACES_PREFERRED = [
+    os.environ.get("JACKPACK_WIRED_IFACE", "eth0"),
+    "eth1",
+    "usb0",
+    os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1")),
+]
 NMAP_TOP_PORTS = 100
 NMAP_TIMING = "-T4"
 
@@ -470,7 +475,7 @@ def _recon_sequence():
     _set_state(
         phase="Detect",
         status_line1="Detecting iface...",
-        status_line2="Checking eth0/wlan0",
+        status_line2="Checking eth0/wlan1",
         progress_pct=5,
     )
 

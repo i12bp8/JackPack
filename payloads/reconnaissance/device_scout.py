@@ -34,8 +34,8 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -246,10 +246,11 @@ def _hop_worker(iface, channels):
 
 
 def _iw_scan_worker():
+    scan_iface = os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1"))
     while running:
         try:
             r = subprocess.run(
-                ["/usr/sbin/iw", "dev", "wlan0", "scan", "-u"],
+                ["/usr/sbin/iw", "dev", scan_iface, "scan", "-u"],
                 capture_output=True, text=True, timeout=15)
             if r.returncode == 0:
                 cur_mac = None
@@ -403,7 +404,8 @@ def start_all():
             chs = [ALL_CHANNELS[i] for i in range(idx, len(ALL_CHANNELS), n)]
             threading.Thread(target=_hop_worker, args=(iface, chs), daemon=True).start()
 
-    if os.path.isdir("/sys/class/net/wlan0/wireless"):
+    scan_iface = os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1"))
+    if os.path.isdir(f"/sys/class/net/{scan_iface}/wireless"):
         threading.Thread(target=_iw_scan_worker, daemon=True).start()
 
     # BLE via bleak (same as ble_scanner — works reliably)

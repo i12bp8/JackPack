@@ -30,8 +30,8 @@ sys.path.append(str(ROOT_DIR))
 
 import requests
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 
 from payloads._input_helper import get_button

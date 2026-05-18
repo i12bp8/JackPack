@@ -15,7 +15,7 @@ import threading
 # Ensure RaspyJack modules are importable when launched directly
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
-import LCD_1in44, LCD_Config  # type: ignore
+from packjack.compat import LCD_1in44, LCD_Config  # type: ignore
 from PIL import Image, ImageDraw, ImageFont  # type: ignore
 from payloads._display_helper import ScaledDraw, scaled_font
 import RPi.GPIO as GPIO  # type: ignore

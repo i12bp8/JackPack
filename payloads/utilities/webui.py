@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-RaspyJack payload - WebUI Info & Control
-=========================================
+JackPack payload - WebUI Info & Control
+=======================================
 Author: 7h30th3r0n3
 
 Displays WebUI URLs for all network interfaces, service status,
-and allows restarting raspyjack-webui.service.
+and allows restarting packjack-web.service.
 
 Controls:
   UP / DOWN  Scroll interface list
-  KEY1       Restart raspyjack-webui.service
+  KEY1       Restart packjack-web.service
   KEY3/LEFT  Back to RaspyJack
 """
 
@@ -22,7 +22,7 @@ import subprocess
 sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..', '..')))
 
 import RPi.GPIO as GPIO
-import LCD_1in44, LCD_Config
+from packjack.compat import LCD_1in44, LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -99,7 +99,7 @@ def _get_service_status():
     """Return service status string."""
     try:
         r = subprocess.run(
-            ["systemctl", "is-active", "raspyjack-webui"],
+            ["systemctl", "is-active", "packjack-web"],
             capture_output=True, text=True, timeout=3,
         )
         return r.stdout.strip()
@@ -111,7 +111,7 @@ def _restart_service():
     """Restart the webui service."""
     try:
         subprocess.run(
-            ["sudo", "systemctl", "restart", "raspyjack-webui.service"],
+            ["sudo", "systemctl", "restart", "packjack-web.service"],
             capture_output=True, timeout=15,
         )
     except Exception:

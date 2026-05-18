@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-RaspyJack – WebSocket device server
-Compatible websockets v11+ / v12+ /
+JackPack WebSocket device server.
 """
 
 import asyncio
@@ -25,6 +24,11 @@ from urllib.parse import urlparse, parse_qs
 
 import websockets
 
+try:
+    from packjack import interfaces as jp_ifaces
+except Exception:
+    jp_ifaces = None
+
 
 # ------------------------------ Config ---------------------------------------
 FRAME_PATH = Path(os.environ.get("RJ_FRAME_PATH", "/dev/shm/raspyjack_last.jpg"))
@@ -35,9 +39,9 @@ HOST = os.environ.get("RJ_WS_HOST", "0.0.0.0")
 PORT = int(os.environ.get("RJ_WS_PORT", "8765"))
 FPS = float(os.environ.get("RJ_FPS", "10"))
 CARDPUTER_FPS = float(os.environ.get("RJ_CARDPUTER_FPS", "6"))
-TOKEN_FILE = Path(os.environ.get("RJ_WS_TOKEN_FILE", "/root/Raspyjack/.webui_token"))
-AUTH_FILE = Path(os.environ.get("RJ_WEB_AUTH_FILE", "/root/Raspyjack/.webui_auth.json"))
-AUTH_SECRET_FILE = Path(os.environ.get("RJ_WEB_AUTH_SECRET_FILE", "/root/Raspyjack/.webui_session_secret"))
+TOKEN_FILE = Path(os.environ.get("RJ_WS_TOKEN_FILE", "/root/JackPack/.webui_token"))
+AUTH_FILE = Path(os.environ.get("RJ_WEB_AUTH_FILE", "/root/JackPack/.webui_auth.json"))
+AUTH_SECRET_FILE = Path(os.environ.get("RJ_WEB_AUTH_SECRET_FILE", "/root/JackPack/.webui_session_secret"))
 SESSION_COOKIE_NAME = os.environ.get("RJ_WEB_SESSION_COOKIE", "rj_session")
 INPUT_SOCK = os.environ.get("RJ_INPUT_SOCK", "/dev/shm/rj_input.sock")
 TEXT_SESSION_FILE = Path(os.environ.get("RJ_TEXT_SESSION_FILE", "/dev/shm/rj_text_session.json"))
@@ -52,7 +56,12 @@ VERBOSE_INPUT_LOGS = os.environ.get("RJ_WS_VERBOSE_INPUT", "0") == "1"
 # WebSocket server only listens on these interfaces — wlan1+ are for attacks
 # Override via RJ_WEBUI_INTERFACES env var (comma-separated)
 _env_ifaces = os.environ.get("RJ_WEBUI_INTERFACES", "").strip()
-WEBUI_INTERFACES = [i.strip() for i in _env_ifaces.split(",") if i.strip()] if _env_ifaces else ["eth0", "eth1", "wlan0", "tailscale0"]
+if _env_ifaces:
+    WEBUI_INTERFACES = [i.strip() for i in _env_ifaces.split(",") if i.strip()]
+else:
+    _wired = jp_ifaces.wired_iface() if jp_ifaces is not None else "eth0"
+    _ap = jp_ifaces.ap_iface() if jp_ifaces is not None else "wlan0"
+    WEBUI_INTERFACES = [_wired, _ap, "tailscale0"]
 
 
 def _load_shared_token():
@@ -870,7 +879,7 @@ async def main():
             await broadcast_frames(caches)
         return
 
-    # Default: bind only to eth0 + wlan0 (+ localhost).  wlan1+ stay untouched.
+    # Default: bind only to wired/control/tunnel addresses. Payload WiFi stays untouched.
     bind_addrs = _get_webui_bind_addrs()
     servers = []
 

@@ -33,8 +33,8 @@ import numpy as np
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font, S, SX, SY
 
@@ -43,7 +43,7 @@ try:
 except ImportError:
     from payloads._input_helper import get_button
 
-import evdev_keys
+from packjack.compat import evdev_keys
 from payloads.sdr._sdr_core import SDRDevice, detect_sdr, compute_fft, start_fm_audio, stop_fm_audio
 from payloads.sdr._waterfall import WaterfallBuffer, draw_spectrum, draw_signal_meter, draw_freq_scale, COLORMAPS
 from payloads.sdr._presets import (

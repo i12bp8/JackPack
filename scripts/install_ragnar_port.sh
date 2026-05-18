@@ -72,5 +72,5 @@ else
 fi
 
 step "Ragnar port dependency pass complete"
-info "Launch from Raspyjack: Payload -> Utilities -> Ragnar"
+info "Launch from JackPack: Payload -> Utilities -> Ragnar"
 info "Default Ragnar port: 8091"

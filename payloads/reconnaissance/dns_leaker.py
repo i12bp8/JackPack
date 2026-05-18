@@ -60,7 +60,7 @@ REQUIREMENTS
 - Root privileges
 - scapy installed
 - RaspyJack-compatible Waveshare 1.44" LCD HAT
-- Correct network interface selected (eth0 / wlan0 / br0)
+- Correct network interface selected (eth0 / wlan1 / br0)
 
 -------------------------------------------------------------------------------
 OPERATIONAL NOTES
@@ -75,7 +75,7 @@ import os, sys, time, signal, threading, datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..', '..')))
 
 import RPi.GPIO as GPIO
-import LCD_1in44, LCD_Config
+from packjack.compat import LCD_1in44, LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 

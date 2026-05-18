@@ -30,7 +30,7 @@ from datetime import datetime, timedelta
 # ----------------------------- Third-party libs ---------------------------
 # These come pre-installed with RaspyJack.
 import RPi.GPIO as GPIO
-import LCD_1in44, LCD_Config
+from packjack.compat import LCD_1in44, LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 

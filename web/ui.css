@@ -42,6 +42,172 @@ a.ide-toolbar-btn {
   box-shadow: var(--rj-parity-glow);
 }
 
+.jp-hero,
+.jp-card,
+.jp-panel {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.46);
+  box-shadow: 0 14px 30px rgba(2, 6, 23, 0.35);
+  backdrop-filter: blur(12px);
+}
+
+.jp-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.42fr);
+  gap: 1rem;
+  border-radius: 18px;
+  padding: 1rem;
+}
+
+.jp-hero h1 {
+  margin: 0.2rem 0 0;
+  font-size: clamp(2rem, 5vw, 4rem);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 0.95;
+  color: #f8fafc;
+}
+
+.jp-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.jp-hero-meta span,
+.jp-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(2, 6, 23, 0.35);
+  padding: 0.2rem 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.jp-hero-payload,
+.jp-card,
+.jp-panel {
+  border-radius: 14px;
+}
+
+.jp-hero-payload {
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  background: rgba(2, 6, 23, 0.34);
+  padding: 0.9rem;
+}
+
+.jp-card {
+  padding: 0.85rem;
+}
+
+.jp-card-label {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  color: #94a3b8;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.jp-card-value {
+  margin-top: 0.55rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.jp-card-meta,
+.jp-panel-subtitle {
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.jp-panel {
+  padding: 0.85rem;
+  min-width: 0;
+}
+
+.jp-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.jp-panel-title {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #6ee7b7;
+}
+
+.jp-payload-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 0.55rem;
+  max-height: 25rem;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.jp-payload-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 8.25rem;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.17);
+  background: rgba(2, 6, 23, 0.34);
+  padding: 0.7rem;
+}
+
+.jp-payload-name {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #e2e8f0;
+}
+
+.jp-payload-path {
+  margin-top: 0.2rem;
+  font-size: 0.68rem;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+
+.jp-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.55rem;
+}
+
+.jp-log {
+  min-height: 18rem;
+  max-height: 25rem;
+  overflow: auto;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.17);
+  background: rgba(2, 6, 23, 0.62);
+  padding: 0.75rem;
+  color: #d1fae5;
+  font-size: 0.72rem;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 900px) {
+  .jp-hero {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Shared nav sizing */
 #sidebar nav > button,
 #sidebar nav > a {

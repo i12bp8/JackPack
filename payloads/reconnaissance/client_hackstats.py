@@ -31,8 +31,8 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -51,8 +51,8 @@ ROW_H = 12
 
 LOOT_DIR = "/root/Raspyjack/loot/ClientStats"
 CSV_PREFIX = "/tmp/rj_clistats"
-SCAN_IFACE = "wlan1"
-MON_IFACE = "wlan1mon"
+SCAN_IFACE = os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1"))
+MON_IFACE = f"{SCAN_IFACE}mon"
 PARSE_INTERVAL = 3.0
 
 SORT_MODES = ["packets", "probes"]

@@ -18,7 +18,7 @@ import random
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO  # type: ignore
-import LCD_1in44, LCD_Config  # type: ignore
+from packjack.compat import LCD_1in44, LCD_Config  # type: ignore
 from PIL import Image, ImageDraw, ImageFont  # type: ignore
 
 from payloads._input_helper import get_button

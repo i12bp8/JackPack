@@ -22,7 +22,7 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44, LCD_Config
+from packjack.compat import LCD_1in44, LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -151,7 +151,11 @@ tests_done = 0
 # ---------------------------------------------------------------------------
 
 def _detect_subnet():
-    for iface in ("eth0", "wlan0", "usb0"):
+    for iface in (
+        os.environ.get("JACKPACK_WIRED_IFACE", "eth0"),
+        os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1")),
+        "usb0",
+    ):
         try:
             res = subprocess.run(["ip", "-4", "addr", "show", iface],
                                  capture_output=True, text=True, timeout=5)

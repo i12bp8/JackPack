@@ -10,7 +10,7 @@ distribution on the LCD.
 
 Controls:
   UP / DOWN  -- Scroll top talkers list
-  KEY1       -- Toggle interface (eth0 / wlan0 / wlan1)
+  KEY1       -- Toggle interface (eth0 / wlan1 / wlan1)
   KEY2       -- Export stats to loot
   KEY3       -- Exit
 
@@ -29,8 +29,8 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -46,7 +46,7 @@ PINS = {
 WIDTH, HEIGHT = LCD_1in44.LCD_WIDTH, LCD_1in44.LCD_HEIGHT
 
 LOOT_DIR = "/root/Raspyjack/loot/Sentinel"
-INTERFACES = ["eth0", "wlan0", "wlan1"]
+INTERFACES = ["eth0", "wlan1"]
 ROW_H = 12
 ROWS_VISIBLE = 5
 

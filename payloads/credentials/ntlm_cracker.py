@@ -10,7 +10,7 @@ john with user-selected attack mode.
 
 Setup / Prerequisites:
   - Requires john (/usr/sbin/john): apt install john
-  - Reads hashes from Responder/logs/ and loot/NTLMRelay/.
+  - Reads hashes from vendor/responder/logs/ and loot/NTLMRelay/.
 
 Controls:
   OK         -- Select file / start cracking
@@ -34,8 +34,8 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -59,7 +59,7 @@ font = scaled_font()
 JOHN_BIN = "/usr/sbin/john"
 DEFAULT_WORDLIST = "/usr/share/john/password.lst"
 WORDLIST_DIR = "/root/Raspyjack/loot/wordlists"
-RESPONDER_LOG_DIR = "/root/Raspyjack/Responder/logs"
+RESPONDER_LOG_DIR = "/root/Raspyjack/vendor/responder/logs"
 RELAY_LOOT_DIR = "/root/Raspyjack/loot/NTLMRelay"
 LOOT_DIR = "/root/Raspyjack/loot/CrackedNTLM"
 ROWS_VISIBLE = 6

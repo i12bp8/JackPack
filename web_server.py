@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-RaspyJack WebUI HTTP server
----------------------------
+JackPack WebUI HTTP server
+--------------------------
 Serves the static WebUI and exposes a small, read-only API to browse loot/.
 
 Routes:
@@ -19,8 +19,8 @@ Environment:
   RJ_WEB_PORT  Port to bind (default: 8080)
   RJ_WS_TOKEN  Optional shared token for API access (Bearer header)
   RJ_WS_TOKEN_FILE Optional token file (default: <repo>/.webui_token)
-  RJ_WEB_AUTH_FILE Auth user storage file (default: /root/Raspyjack/.webui_auth.json)
-  RJ_WEB_AUTH_SECRET_FILE Session signing secret file (default: /root/Raspyjack/.webui_session_secret)
+  RJ_WEB_AUTH_FILE Auth user storage file (default: /root/JackPack/.webui_auth.json)
+  RJ_WEB_AUTH_SECRET_FILE Session signing secret file (default: /root/JackPack/.webui_session_secret)
   RJ_WEB_SESSION_TTL Session lifetime seconds (default: 28800)
   RJ_WEB_WS_TICKET_TTL WS ticket lifetime seconds (default: 120)
 """
@@ -47,6 +47,16 @@ from urllib.parse import parse_qs, urlparse, unquote
 
 from nmap_parser import parse_nmap_xml_file
 
+try:
+    from packjack import payload_runner
+except Exception:
+    payload_runner = None
+
+try:
+    from packjack import interfaces as jp_ifaces
+except Exception:
+    jp_ifaces = None
+
 ROOT_DIR = Path(__file__).resolve().parent
 WEB_DIR = ROOT_DIR / "web"
 LOOT_DIR = ROOT_DIR / "loot"
@@ -55,13 +65,14 @@ PAYLOAD_STATE_PATH = Path("/dev/shm/rj_payload_state.json")
 DISCORD_WEBHOOK_PATH = ROOT_DIR / "discord_webhook.txt"
 WIGLE_CREDENTIALS_PATH = ROOT_DIR / ".wigle_credentials.json"
 TOKEN_FILE = Path(os.environ.get("RJ_WS_TOKEN_FILE", str(ROOT_DIR / ".webui_token")))
-AUTH_FILE = Path(os.environ.get("RJ_WEB_AUTH_FILE", "/root/Raspyjack/.webui_auth.json"))
-AUTH_SECRET_FILE = Path(os.environ.get("RJ_WEB_AUTH_SECRET_FILE", "/root/Raspyjack/.webui_session_secret"))
+AUTH_FILE = Path(os.environ.get("RJ_WEB_AUTH_FILE", "/root/JackPack/.webui_auth.json"))
+AUTH_SECRET_FILE = Path(os.environ.get("RJ_WEB_AUTH_SECRET_FILE", "/root/JackPack/.webui_session_secret"))
 SESSION_COOKIE_NAME = "rj_session"
 SESSION_TTL_SECONDS = int(os.environ.get("RJ_WEB_SESSION_TTL", str(8 * 60 * 60)))
 WS_TICKET_TTL_SECONDS = int(os.environ.get("RJ_WEB_WS_TICKET_TTL", "120"))
 TAILSCALE_KEY_PATH = ROOT_DIR / ".tailscale_auth_key"
 TAILSCALE_STATUS_PATH = Path("/dev/shm/rj_tailscale_status.json")
+PAYLOAD_LOG_PATH = LOOT_DIR / "payload.log"
 
 
 def _load_shared_token() -> str | None:
@@ -111,9 +122,17 @@ HOST = os.environ.get("RJ_WEB_HOST", "0.0.0.0")
 PORT = int(os.environ.get("RJ_WEB_PORT", "8080"))
 TOKEN = _load_shared_token()
 AUTH_SECRET = _load_or_create_auth_secret()
+HEADLESS_MODE = os.environ.get("RJ_HEADLESS", "0") == "1"
 
-# WebUI only listens on these interfaces — wlan1+ are for attacks/monitor mode
-WEBUI_INTERFACES = ["eth0", "eth1", "wlan0", "tailscale0"]
+# WebUI only listens on the Pi 5 wired port, control AP, and tunnels by default.
+# The payload WiFi interface stays free for monitor/client work.
+_env_webui_ifaces = os.environ.get("RJ_WEBUI_INTERFACES", "").strip()
+if _env_webui_ifaces:
+    WEBUI_INTERFACES = [i.strip() for i in _env_webui_ifaces.split(",") if i.strip()]
+else:
+    _wired = jp_ifaces.wired_iface() if jp_ifaces is not None else "eth0"
+    _ap = jp_ifaces.ap_iface() if jp_ifaces is not None else "wlan0"
+    WEBUI_INTERFACES = [_wired, _ap, "tailscale0"]
 
 
 def _get_interface_ip(interface: str) -> str | None:
@@ -312,83 +331,6 @@ def _tailscale_write_key(key: str) -> tuple[bool, str]:
         return False, f"write error: {exc}"
 
 
-def _regenerate_caddyfile_and_reload() -> None:
-    """
-    Regenerate /etc/caddy/Caddyfile with current IPs (eth0, wlan0, tailscale0)
-    and reload Caddy. Same logic as install_raspyjack.sh so that installing
-    Tailscale from the WebUI updates HTTPS to listen on the Tailscale IP
-    without re-running the install script.
-    """
-    hosts: list[str] = []
-    for iface in ("eth0", "wlan0", "tailscale0"):
-        try:
-            res = subprocess.run(
-                ["ip", "-4", "-o", "addr", "show", iface],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if res.returncode != 0 or not res.stdout:
-                continue
-            # First line: "2: eth0    inet 192.168.1.100/24 ..." -> take 4th field, strip /suffix
-            line = res.stdout.strip().split("\n")[0]
-            parts = line.split()
-            if len(parts) >= 4:
-                addr = parts[3].split("/")[0].strip()
-                if addr and addr not in hosts:
-                    hosts.append(addr)
-        except Exception:
-            continue
-    hosts.append("localhost")
-
-    if not hosts:
-        return
-
-    caddy_site_addrs = ", ".join(hosts)
-    caddyfile_content = f"""{{
-    # RaspyJack self-signed internal CA (local trust only)
-    auto_https disable_redirects
-}}
-
-{caddy_site_addrs} {{
-    tls internal
-
-    @ws path /ws*
-    reverse_proxy @ws 127.0.0.1:8765 {{
-        header_up X-Forwarded-Proto {{scheme}}
-        header_up X-Forwarded-Host {{host}}
-    }}
-
-    reverse_proxy 127.0.0.1:8080 {{
-        header_up X-Forwarded-Proto {{scheme}}
-        header_up X-Forwarded-Host {{host}}
-    }}
-}}
-"""
-
-    tmp = Path("/dev/shm/rj_caddyfile_tmp")
-    try:
-        tmp.write_text(caddyfile_content, encoding="utf-8")
-        subprocess.run(
-            ["sudo", "cp", str(tmp), "/etc/caddy/Caddyfile"],
-            check=True,
-            timeout=10,
-        )
-        subprocess.run(
-            ["sudo", "systemctl", "reload", "caddy"],
-            check=True,
-            timeout=15,
-        )
-    except Exception:
-        pass
-    finally:
-        try:
-            if tmp.exists():
-                tmp.unlink()
-        except Exception:
-            pass
-
-
 def _tailscale_run_install_and_up() -> None:
     """
     Run the official install script and bring Tailscale up using the stored auth key.
@@ -481,9 +423,6 @@ def _tailscale_run_install_and_up() -> None:
         })
         return
 
-    # Regenerate Caddyfile with tailscale0 IP and reload Caddy so HTTPS works over Tailscale.
-    _regenerate_caddyfile_and_reload()
-
     _tailscale_write_status({
         "installing": False,
         "ok": True,
@@ -547,8 +486,6 @@ def _tailscale_run_reauth() -> None:
             "error": msg[:200],
         })
         return
-
-    _regenerate_caddyfile_and_reload()
 
     _tailscale_write_status({
         "installing": False,
@@ -641,6 +578,141 @@ def _read_ipv4_interfaces() -> list[dict]:
     except Exception:
         pass
     return out
+
+
+def _env_first(*names: str, default: str = "") -> str:
+    for name in names:
+        value = str(os.environ.get(name, "")).strip()
+        if value:
+            return value
+    return default
+
+
+def _iface_role(name: str) -> str:
+    if jp_ifaces is not None:
+        return jp_ifaces.interface_role(name)
+    ap_iface = _env_first("JACKPACK_AP_IFACE", "PACKJACK_AP_IFACE", default="wlan0")
+    attack_iface = _env_first("JACKPACK_ATTACK_IFACE", "PACKJACK_ATTACK_IFACE", default="wlan1")
+    wired_iface = _env_first("JACKPACK_WIRED_IFACE", "PACKJACK_WIRED_IFACE", default="eth0")
+    if name == ap_iface:
+        return "control_ap"
+    if name == attack_iface:
+        return "attack_wifi"
+    if name == wired_iface:
+        return "wired_target"
+    if name.startswith("tailscale"):
+        return "tunnel"
+    return "network"
+
+
+def _read_headless_status() -> dict:
+    interfaces = _read_ipv4_interfaces()
+    for iface in interfaces:
+        iface["role"] = _iface_role(str(iface.get("name") or ""))
+
+    payload_status = {"running": False, "path": None, "mode": "headless" if HEADLESS_MODE else "classic"}
+    if HEADLESS_MODE and payload_runner is not None:
+        try:
+            payload_status = payload_runner.status()
+        except Exception:
+            pass
+    elif PAYLOAD_STATE_PATH.exists():
+        try:
+            raw = PAYLOAD_STATE_PATH.read_text(encoding="utf-8")
+            payload_status = json.loads(raw) if raw else payload_status
+        except Exception:
+            pass
+
+    ap_iface = _env_first("JACKPACK_AP_IFACE", "PACKJACK_AP_IFACE", default="wlan0")
+    attack_iface = _env_first("JACKPACK_ATTACK_IFACE", "PACKJACK_ATTACK_IFACE", default="wlan1")
+    wired_iface = _env_first("JACKPACK_WIRED_IFACE", "PACKJACK_WIRED_IFACE", default="eth0")
+    ap_ssid = _env_first("JACKPACK_AP_SSID", "PACKJACK_AP_SSID", default="JackPack")
+    ap_address = _env_first("JACKPACK_AP_ADDRESS", "PACKJACK_AP_ADDRESS", default="10.66.0.1/24")
+    hostname = _env_first("JACKPACK_HOSTNAME", "PACKJACK_HOSTNAME", default="jackpack")
+    fallback_host = ap_address.split("/", 1)[0]
+
+    return {
+        "name": "JackPack",
+        "headless": HEADLESS_MODE,
+        "web": {
+            "hostname": f"{hostname}.local",
+            "url": f"http://{hostname}.local:{PORT}",
+            "fallback_url": f"http://{fallback_host}:{PORT}",
+        },
+        "ap": {
+            "iface": ap_iface,
+            "ssid": ap_ssid,
+            "address": ap_address,
+            "present": any(i.get("name") == ap_iface for i in interfaces),
+        },
+        "attack": {
+            "iface": attack_iface,
+            "present": any(i.get("name") == attack_iface for i in interfaces),
+        },
+        "wired": {
+            "iface": wired_iface,
+            "present": any(i.get("name") == wired_iface for i in interfaces),
+        },
+        "interfaces": interfaces,
+        "payload": payload_status,
+    }
+
+
+def _payload_meta(path: Path) -> dict:
+    meta = {
+        "headless": "unknown",
+        "needs_display": False,
+        "uses_wifi": False,
+        "uses_external_wifi": False,
+        "tags": [],
+    }
+    try:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return meta
+
+    display_markers = ("LCD_", "LCD.", "ImageDraw", "ScaledDraw", "_display_helper")
+    input_markers = ("get_button", "KEY3", "KEY_PRESS", "_input_helper")
+    wifi_markers = ("wlan", "airmon", "airodump", "aireplay", "iw ", "iwconfig", "hostapd")
+    external_wifi_markers = ("wlan1", "PACKJACK_ATTACK_IFACE", "JACKPACK_ATTACK_IFACE", "get_best_interface")
+
+    meta["needs_display"] = any(marker in text for marker in display_markers)
+    meta["uses_input"] = any(marker in text for marker in input_markers)
+    meta["uses_wifi"] = any(marker in text for marker in wifi_markers)
+    meta["uses_external_wifi"] = any(marker in text for marker in external_wifi_markers)
+    if "RJ_HEADLESS" in text or "headless" in text.lower():
+        meta["headless"] = "aware"
+    elif meta["needs_display"] or meta["uses_input"]:
+        meta["headless"] = "compat"
+    else:
+        meta["headless"] = "native"
+
+    if meta["headless"] == "native":
+        meta["tags"].append("native")
+    elif meta["headless"] == "aware":
+        meta["tags"].append("headless-aware")
+    else:
+        meta["tags"].append("compat")
+    if meta["uses_wifi"]:
+        meta["tags"].append("wifi")
+    if meta["uses_external_wifi"]:
+        meta["tags"].append("wlan1")
+    if meta["needs_display"]:
+        meta["tags"].append("lcd-compat")
+    return meta
+
+
+def _tail_text(path: Path, max_bytes: int = 65536) -> str:
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            size = handle.tell()
+            handle.seek(max(0, size - max_bytes), os.SEEK_SET)
+            return handle.read().decode("utf-8", "replace")
+    except FileNotFoundError:
+        return ""
+    except Exception as exc:
+        return f"log read error: {exc}"
 
 
 def _b64url_encode(raw: bytes) -> str:
@@ -881,7 +953,7 @@ def _is_text_file(path: Path) -> bool:
     return False
 
 
-class RaspyJackHandler(SimpleHTTPRequestHandler):
+class JackPackHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(WEB_DIR), **kwargs)
 
@@ -896,6 +968,7 @@ class RaspyJackHandler(SimpleHTTPRequestHandler):
             parsed.path.startswith("/api/loot/")
             or parsed.path.startswith("/api/payloads/")
             or parsed.path.startswith("/api/system/")
+            or parsed.path.startswith("/api/headless/")
             or parsed.path.startswith("/api/settings/")
             or parsed.path.startswith("/api/auth/")
             or parsed.path.startswith("/api/wardriving/")
@@ -917,6 +990,9 @@ class RaspyJackHandler(SimpleHTTPRequestHandler):
                 return
             if parsed.path == "/api/payloads/status":
                 self._handle_payloads_status()
+                return
+            if parsed.path == "/api/payloads/log":
+                self._handle_payloads_log(query)
                 return
             if parsed.path == "/api/payloads/tree":
                 self._handle_payloads_tree()
@@ -949,6 +1025,9 @@ class RaspyJackHandler(SimpleHTTPRequestHandler):
 
             if parsed.path == "/api/system/status":
                 self._handle_system_status()
+                return
+            if parsed.path == "/api/headless/status":
+                self._handle_headless_status()
                 return
             if parsed.path == "/api/settings/discord_webhook":
                 if not _auth_ok(self, query):
@@ -1019,6 +1098,13 @@ class RaspyJackHandler(SimpleHTTPRequestHandler):
                 _json_response(self, {"error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
                 return
             self._handle_payloads_start()
+            return
+        if parsed.path == "/api/payloads/stop":
+            query = parse_qs(parsed.query or "")
+            if not _auth_ok(self, query):
+                _json_response(self, {"error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
+                return
+            self._handle_payloads_stop()
             return
         if parsed.path == "/api/payloads/entry":
             query = parse_qs(parsed.query or "")
@@ -1131,9 +1217,11 @@ class RaspyJackHandler(SimpleHTTPRequestHandler):
                 if not name.endswith(".py") or name.startswith("_"):
                     continue
                 rel_path = os.path.join(rel_dir, name) if rel_dir != "." else name
+                full_path = Path(root) / name
                 categories.setdefault(category, []).append({
                     "name": os.path.splitext(name)[0],
                     "path": rel_path.replace("\\", "/"),
+                    "meta": _payload_meta(full_path),
                 })
 
         order = [
@@ -1193,6 +1281,18 @@ class RaspyJackHandler(SimpleHTTPRequestHandler):
             _json_response(self, {"error": "not found"}, status=HTTPStatus.NOT_FOUND)
             return
 
+        if HEADLESS_MODE and payload_runner is not None:
+            raw_args = body.get("args")
+            args = raw_args if isinstance(raw_args, list) else None
+            try:
+                status = payload_runner.start(rel_path, args)
+                _json_response(self, {"ok": True, **status})
+            except payload_runner.PayloadError as exc:
+                _json_response(self, {"error": str(exc)}, status=HTTPStatus.CONFLICT)
+            except Exception as exc:
+                _json_response(self, {"error": f"start failed: {exc}"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
         try:
             request_path = Path("/dev/shm/rj_payload_request.json")
             request_path.write_text(json.dumps({
@@ -1206,6 +1306,12 @@ class RaspyJackHandler(SimpleHTTPRequestHandler):
         _json_response(self, {"ok": True})
 
     def _handle_payloads_status(self) -> None:
+        if HEADLESS_MODE and payload_runner is not None:
+            try:
+                _json_response(self, payload_runner.status())
+            except Exception:
+                _json_response(self, {"running": False, "path": None, "mode": "headless"})
+            return
         try:
             if not PAYLOAD_STATE_PATH.exists():
                 _json_response(self, {"running": False, "path": None})
@@ -1219,6 +1325,44 @@ class RaspyJackHandler(SimpleHTTPRequestHandler):
             })
         except Exception:
             _json_response(self, {"running": False, "path": None})
+
+    def _handle_payloads_log(self, query: dict) -> None:
+        try:
+            max_bytes = int(query.get("bytes", ["65536"])[0])
+        except Exception:
+            max_bytes = 65536
+        max_bytes = max(1024, min(262144, max_bytes))
+        text = _tail_text(PAYLOAD_LOG_PATH, max_bytes=max_bytes)
+        _json_response(self, {
+            "path": str(PAYLOAD_LOG_PATH.relative_to(ROOT_DIR)) if PAYLOAD_LOG_PATH.is_absolute() else str(PAYLOAD_LOG_PATH),
+            "bytes": max_bytes,
+            "text": text,
+            "exists": PAYLOAD_LOG_PATH.exists(),
+            "mtime": int(PAYLOAD_LOG_PATH.stat().st_mtime) if PAYLOAD_LOG_PATH.exists() else None,
+        })
+
+    def _handle_payloads_stop(self) -> None:
+        if HEADLESS_MODE and payload_runner is not None:
+            try:
+                _json_response(self, {"ok": True, **payload_runner.stop()})
+            except Exception as exc:
+                _json_response(self, {"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+        try:
+            sock_path = os.environ.get("RJ_INPUT_SOCK", "/dev/shm/rj_input.sock")
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+            try:
+                s.sendto(json.dumps({"button": "KEY3", "state": "press"}).encode(), sock_path)
+                time.sleep(0.08)
+                s.sendto(json.dumps({"button": "KEY3", "state": "release"}).encode(), sock_path)
+            finally:
+                s.close()
+            _json_response(self, {"ok": True, "status": "stopping"})
+        except Exception as exc:
+            _json_response(self, {"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def _handle_headless_status(self) -> None:
+        _json_response(self, _read_headless_status())
 
     def _payload_tree_node(self, base: Path, current: Path) -> dict:
         rel = "" if current == base else str(current.relative_to(base)).replace("\\", "/")
@@ -1494,8 +1638,8 @@ class RaspyJackHandler(SimpleHTTPRequestHandler):
     # ── Wardriving API ────────────────────────────────────────────
     def _handle_wardriving_sessions(self) -> None:
         """List all wardriving session files."""
-        sessions_dir = "/root/Raspyjack/loot/wardriving/sessions"
-        loot_dir = "/root/Raspyjack/loot/wardriving"
+        sessions_dir = str(LOOT_DIR / "wardriving" / "sessions")
+        loot_dir = str(LOOT_DIR / "wardriving")
         result = []
         # Session files
         if os.path.isdir(sessions_dir):
@@ -1518,7 +1662,7 @@ class RaspyJackHandler(SimpleHTTPRequestHandler):
 
     def _handle_wardriving_live(self) -> None:
         """Serve the live wardriving CSV."""
-        path = "/root/Raspyjack/loot/wardriving/wardriving_live.csv"
+        path = str(LOOT_DIR / "wardriving" / "wardriving_live.csv")
         if os.path.isfile(path):
             self.send_response(200)
             self.send_header("Content-Type", "text/csv")
@@ -1533,7 +1677,8 @@ class RaspyJackHandler(SimpleHTTPRequestHandler):
         """Serve a specific session CSV file."""
         path = query.get("path", [""])[0]
         # Security: only allow files in the wardriving loot dir
-        if not path or not path.startswith("/root/Raspyjack/loot/wardriving/"):
+        wardriving_root = str((LOOT_DIR / "wardriving").resolve()) + os.sep
+        if not path or not os.path.abspath(path).startswith(wardriving_root):
             self.send_response(403)
             self.end_headers()
             return
@@ -1595,14 +1740,26 @@ class RaspyJackHandler(SimpleHTTPRequestHandler):
             load1, load5, load15 = os.getloadavg()
             payload_running = False
             payload_path = None
-            try:
-                if PAYLOAD_STATE_PATH.exists():
-                    raw = PAYLOAD_STATE_PATH.read_text(encoding="utf-8")
-                    pdata = json.loads(raw) if raw else {}
-                    payload_running = bool(pdata.get("running"))
-                    payload_path = pdata.get("path")
-            except Exception:
-                pass
+            if HEADLESS_MODE and payload_runner is not None:
+                try:
+                    pstatus = payload_runner.status()
+                    payload_running = bool(pstatus.get("running"))
+                    payload_path = pstatus.get("path")
+                except Exception:
+                    pass
+            else:
+                try:
+                    if PAYLOAD_STATE_PATH.exists():
+                        raw = PAYLOAD_STATE_PATH.read_text(encoding="utf-8")
+                        pdata = json.loads(raw) if raw else {}
+                        payload_running = bool(pdata.get("running"))
+                        payload_path = pdata.get("path")
+                except Exception:
+                    pass
+
+            role_map = {i.get("name"): i.get("role") for i in _read_headless_status().get("interfaces", [])}
+            for iface in ifaces:
+                iface["role"] = role_map.get(iface.get("name"), _iface_role(str(iface.get("name") or "")))
 
             _json_response(self, {
                 "cpu_percent": round(cpu, 1),
@@ -1623,7 +1780,7 @@ class RaspyJackHandler(SimpleHTTPRequestHandler):
     def _handle_system_restart_ui(self) -> None:
         try:
             subprocess.run(
-                ["systemctl", "restart", "raspyjack.service"],
+                ["systemctl", "restart", "packjack-web.service"],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -1843,7 +2000,7 @@ def main() -> None:
 
     # If a specific host was set via env var, honour it as-is (single bind)
     if HOST != "0.0.0.0":
-        server = ThreadingHTTPServer((HOST, PORT), RaspyJackHandler)
+        server = ThreadingHTTPServer((HOST, PORT), JackPackHandler)
         print(f"[WebUI] Serving on http://{HOST}:{PORT}")
         try:
             server.serve_forever()
@@ -1853,15 +2010,38 @@ def main() -> None:
             server.server_close()
         return
 
-    # Bind on all interfaces — always reachable on any IP (eth, wlan, tailscale)
-    server = ThreadingHTTPServer(("0.0.0.0", PORT), RaspyJackHandler)
-    print(f"[WebUI] Serving on http://0.0.0.0:{PORT}")
+    bind_addrs = _get_webui_bind_addrs()
+    servers: list[ThreadingHTTPServer] = []
+    for addr, iface in bind_addrs:
+        try:
+            server = ThreadingHTTPServer((addr, PORT), JackPackHandler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            servers.append(server)
+            print(f"[WebUI] Serving on http://{addr}:{PORT} ({iface})")
+        except Exception as exc:
+            print(f"[WebUI] Could not bind {addr}:{PORT} ({iface}): {exc}")
+
+    if not servers:
+        server = ThreadingHTTPServer(("0.0.0.0", PORT), JackPackHandler)
+        print(f"[WebUI] Serving on http://0.0.0.0:{PORT} (fallback)")
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            server.server_close()
+        return
+
     try:
-        server.serve_forever()
+        while True:
+            time.sleep(3600)
     except KeyboardInterrupt:
         pass
     finally:
-        server.server_close()
+        for server in servers:
+            server.shutdown()
+            server.server_close()
     return
 
     try:

@@ -1,535 +1,161 @@
+# JackPack
+
 <p align="center">
-  <img src="https://img.shields.io/badge/platform-Raspberry%20Pi-red?style=flat-square&logo=raspberry-pi">
-  <img src="https://img.shields.io/badge/code-python3-yellow?style=flat-square&logo=python">
-  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square">
-  <img src="https://img.shields.io/badge/usage-authorized%20testing%20only-blue?style=flat-square">
+  <strong>Headless Raspberry Pi 5 field toolkit forked from RaspyJack</strong><br>
+  <sub>Phone-first WebUI • Pi 5 networking • Authorized red-team workflows</sub>
 </p>
 
-<div align="center">
-  <h1>RaspyJack</h1>
-  <img src="github-img/logo.jpg" width="240" alt="RaspyJack logo"/>
-  <p><strong>Portable Raspberry Pi offensive toolkit</strong> with LCD control, payload launcher, WebUI, and Payload IDE.</p>
-</div>
+<p align="center">
+  <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg">
+  <img alt="Platform: Raspberry Pi 5" src="https://img.shields.io/badge/Platform-Raspberry%20Pi%205-c51a4a?logo=raspberrypi&logoColor=white">
+  <img alt="Interface: Headless WebUI" src="https://img.shields.io/badge/Interface-Headless%20WebUI-111827">
+  <img alt="URL: jackpack.local" src="https://img.shields.io/badge/URL-jackpack.local-22c55e">
+</p>
 
----
+<p align="center">
+  <strong>Open the deck from your phone at <code>http://jackpack.local:8080</code></strong><br>
+  <sub>Fallback on the control AP: <code>http://10.66.0.1:8080</code></sub>
+</p>
 
-## ⚠️ Legal / Safety
+<img alt="JackPack banner" src="docs/assets/jackpack.png">
 
-RaspyJack is for **authorized security testing, research, and education only**.
+## Overview
 
-- Do **not** use it on networks/systems you do not own or have explicit permission to test.
-- You are solely responsible for how you use this project.
-- The authors/contributors are not responsible for misuse.
+JackPack is a Raspberry Pi 5-first, headless fork of **RaspyJack**. It keeps the payload ecosystem, but removes the Pi Zero handheld/LCD workflow as the primary product. The target build is a Pi 5 in a backpack or field case, powered by a battery, controlled from a phone over the Pi's internal WiFi access point, and using the Pi 5 Ethernet port plus an external USB WiFi adapter for authorized testing work.
 
----
+The goal is simple: no tiny screen, no button choreography, no web page pretending to be an LCD. JackPack is a clean control deck for a headless Pi 5.
 
-## ✨ What RaspyJack includes
+> [!IMPORTANT]
+> JackPack is intended only for systems, networks, labs, and client environments where you have explicit authorization. I do not condone illegal use, unauthorized access, vandalism, credential theft, disruption, or misuse of this project.
 
-- LCD-driven handheld-style interface (Waveshare 1.44" or 1.3" HAT)
-- **Dual-display support** — 128x128 (ST7735) and 240x240 (ST7789)
-- **231 payloads** across 13 categories
-- Loot collection + browsing
-- WebUI remote control dashboard
-- Payload IDE (browser editor + run flow)
-- `EXTENSIONS/` work area for reusable trigger and dispatch helpers
-- Vendored Ragnar port with native Raspyjack launcher
-- Responder / DNS spoof / ARP MITM / handshake hunter tooling integration
-- WiFi utilities + attack flows (deauth, evil twin, SSID injection, beacon flood)
-- Evil portal with 84 captive portal templates + credential capture
-- BLE scanner, spam, beacon flood, MITM, replay, audio inject, DoS
-- Reverse shell, Discord C2, HTTPS stealth shell, DuckyScript generator
-- Exfiltration via HTTP, DNS, BLE, Discord, SMB, FTP, USB, Dropbox
-- Dead drop WiFi file sharing with dashboard
-- 25 games including Pac-Man, Tetris, Tron, LLM adventure, labyrinth
+## Hardware Target
 
-Check the WIKI for more ! https://github.com/7h30th3r0n3/Raspyjack/wiki
+- **Raspberry Pi 5** running Raspberry Pi OS Lite.
+- **Internal WiFi / `wlan0`:** JackPack control AP for your phone.
+- **External USB WiFi / `wlan1`:** payload WiFi adapter for monitor, injection, client, and AP workflows.
+- **Built-in Ethernet / `eth0`:** wired target-network interface.
+- **Power bank or field battery.**
+- **No LCD HAT, no Ethernet HAT, no physical buttons required.**
 
----
+## Features
 
-## 🧱 Hardware
+- **Phone-first WebUI:** modern headless dashboard for launch/status/logging.
+- **Friendly local URL:** installer sets up `jackpack.local` with Avahi/mDNS.
+- **Direct payload runtime:** start, stop, and inspect payloads without simulating LCD buttons.
+- **Pi 5 interface policy:** `wlan0` stays control-only, `wlan1` stays payload WiFi, `eth0` stays wired target.
+- **Payload compatibility:** legacy display/input imports are quarantined under `packjack/compat/`.
+- **Loot browser:** browse runtime output and captures from the WebUI.
+- **Nmap visualization:** inspect scan output from the browser.
+- **Browser terminal:** WebSocket shell bridge for field control.
+- **Clean installer:** interactive or scripted setup for AP name, AP password, hostname, ports, and interface roles.
 
-## ✅ Required Hardware
-<table>
-  <tr>
-    <th>Item</th>
-    <th>Description</th>
-    <th>Buy</th>
-  </tr>
-  <tr>
-    <td><strong>Waveshare 1.44" LCD HAT</strong> (128x128)</td>
-    <td>SPI TFT ST7735 + joystick + 3 buttons</td>
-    <td>
-      <a href="https://s.click.aliexpress.com/e/_c3HTOQQn">Buy</a><br/>
-      <a href="https://s.click.aliexpress.com/e/_EwDqSv4">Buy</a>
-    </td>
-  </tr>
-  <tr>
-    <td><strong>Waveshare 1.3" LCD HAT</strong> (240x240)</td>
-    <td>SPI TFT ST7789 + joystick + 3 buttons</td>
-    <td>
-      <a href="https://s.click.aliexpress.com/e/_c3j1Wy4N">Buy</a>
-    </td>
-  </tr>
-  <tr>
-    <td><strong>Raspberry Pi Zero 2 WH</strong></td>
-    <td>Quad-core 1 GHz, 512 MB RAM – super compact</td>
-    <td><a href="https://s.click.aliexpress.com/e/_omuGisy">Buy</a></td>
-  </tr>
-  <tr>
-    <td><strong>RPI 0W + Waveshare Ethernet/USB HUB HAT</strong></td>
-    <td>3 USB + 1 Ethernet</td>
-    <td><a href="https://s.click.aliexpress.com/e/_oDK0eYc">Buy</a></td>
-  </tr>
-  <tr>
-    <td><strong>Alternative: Dual Ethernet/USB HUB HAT</strong></td>
-    <td>2 USB + 2 Ethernet</td>
-    <td><a href="https://s.click.aliexpress.com/e/_oCX3pUA">Buy</a></td>
-  </tr>
-</table>
-<p><em>Note:</em> Raspyjack on RPI 0w1/2 can run headless trough WebUi, but need an ethernet module at least.</p>
+## Getting Started
 
----
-
-## ➕ Other Hardware (Not Mandatory)
-<table>
-  <tr>
-    <th>Item</th>
-    <th>Description</th>
-    <th>Buy</th>
-  </tr>
-   <tr>
-    <td><strong>Raspberry Pi 3 Model B</strong> </td>
-    <td>Almost same specs as RPI 0w2</td>
-    <td><a href="https://s.click.aliexpress.com/e/_c4k1RESn">Buy</a></td>
-  </tr>
-  <tr>
-    <td><strong>Raspberry Pi 4 Model B</strong> (4 GB)</td>
-    <td>Quad-core 1.5 GHz, full-size HDMI, GigE LAN</td>
-    <td><a href="https://s.click.aliexpress.com/e/_oFOHQdm">Buy</a></td>
-  </tr>
-  <tr>
-    <td><strong>Raspberry Pi 5</strong> (8 GB)</td>
-    <td>Quad-core Cortex-A76 2.4 GHz, PCIe 2.0 x1</td>
-    <td><a href="https://s.click.aliexpress.com/e/_oC6NEZe">Buy</a></td>
-  </tr>
-</table>
-
-<p><em>Note:</em> Raspberry Pi 4/5 is not fully tested yet. It should work trough Webui but screen probably need some ajustement. Feedback is welcome.</p>
-
----
-
-## 📡 WiFi Attack Requirements
-<strong>Important:</strong> The onboard Raspberry Pi WiFi (Broadcom 43430) cannot be used for WiFi attacks.
-
-<table>
-  <tr>
-    <th>Dongle</th>
-    <th>Chipset</th>
-    <th>Monitor Mode</th>
-  </tr>
-  <tr>
-    <td><strong>Alfa AWUS036ACH</strong></td>
-    <td>Realtek RTL8812AU</td>
-    <td>✅ Full support</td>
-  </tr>
-  <tr>
-    <td><strong>TP-Link TL-WN722N v1</strong></td>
-    <td>Atheros AR9271</td>
-    <td>✅ Full support</td>
-  </tr>
-  <tr>
-    <td><strong>Panda PAU09</strong></td>
-    <td>Realtek RTL8812AU</td>
-    <td>✅ Full support</td>
-  </tr>
-</table>
-
-<ul>
-  <li>Deauth attacks on 2.4 GHz and 5 GHz networks</li>
-  <li>Multi-target attacks with interface switching</li>
-  <li>Automatic USB dongle detection and setup</li>
-</ul>
-
----
-
-## 📡 WiFi attack requirement (important)
-
-The onboard Pi WiFi chipset is limited for monitor/injection workflows.
-For WiFi attack payloads, use a **compatible external USB WiFi adapter**.
-
-Examples commonly used:
-- Alfa AWUS036ACH (RTL8812AU)
-- TP-Link TL-WN722N v1 (AR9271)
-- Panda PAU09 (RTL8812AU)
-
----
-
-## 🚀 Install
-
-From a fresh Raspberry Pi OS Lite install:
+From a fresh Raspberry Pi OS Lite install on the Pi 5:
 
 ```bash
 sudo apt update
 sudo apt install -y git
 sudo -i
-git clone https://github.com/7h30th3r0n3/raspyjack.git Raspyjack
-cd Raspyjack
-chmod +x install_raspyjack.sh
-./install_raspyjack.sh
+git clone https://github.com/i12bp8/JackPack.git /root/JackPack
+cd /root/JackPack
+./scripts/install_packjack_rpi5.sh
 reboot
 ```
 
-After reboot, RaspyJack should be available on-device.
+After reboot:
 
----
+1. Connect your phone to the JackPack AP.
+2. Open `http://jackpack.local:8080`.
+3. If `.local` does not resolve on your phone, use `http://10.66.0.1:8080`.
 
-## 🔄 Update
-
-```bash
-sudo -i
-cd /root
-rm -rf Raspyjack
-git clone https://github.com/7h30th3r0n3/raspyjack.git Raspyjack
-cd Raspyjack
-chmod +x install_raspyjack.sh
-./install_raspyjack.sh
-reboot
-```
-
-Before major updates, back up loot/config you care about.
-
----
-
-## 🌐 WebUI + Payload IDE
-
-RaspyJack includes a browser UI and IDE in `web/`.
-
-- WebUI docs: `web/README.md`
-- Main WebUI: `https://<device-ip>/` (or fallback `http://<device-ip>:8080`)
-- Payload IDE: `https://<device-ip>/ide` (or `http://<device-ip>:8080/ide`)
-
-### Local JS sanity check (dev)
+For a fully scripted install:
 
 ```bash
-./scripts/check_webui_js.sh
+sudo ./scripts/install_packjack_rpi5.sh \
+  --non-interactive \
+  --ssid JackPack \
+  --password 'change-this-jackpack-pass' \
+  --hostname jackpack \
+  --ap-iface wlan0 \
+  --attack-iface wlan1 \
+  --wired-iface eth0 \
+  --ap-address 10.66.0.1/24
 ```
 
-This validates syntax for:
-- `web/shared.js`
-- `web/app.js`
-- `web/ide.js`
+## Installer
 
----
+The installer configures the Pi 5 for the intended JackPack layout:
 
-## Ragnar Port
+- Installs NetworkManager, Avahi/mDNS, Python dependencies, wireless tooling, and common payload utilities.
+- Writes `/etc/packjack/packjack.env`.
+- Sets the local hostname, defaulting to `jackpack`, so the WebUI is reachable at `jackpack.local`.
+- Configures the internal WiFi as the control AP.
+- Pins onboard WiFi to `wlan0` and the first USB WiFi adapter to `wlan1`.
+- Enables `packjack-ap.service`, `packjack-web.service`, `packjack-ws.service`, and `packjack-pin-wifi.service`.
+- Creates `/root/Raspyjack -> /root/JackPack` when needed so older payloads with hardcoded upstream paths still resolve.
 
-Raspyjack now includes a vendored port of
-[`PierreGode/Ragnar`](https://github.com/PierreGode/Ragnar).
+## Runtime Services
 
-- Launch it from `Payload -> Utilities -> Ragnar`
-- Ragnar runs as a separate headless stack on `http://<device-ip>:8091`
-- The Raspyjack payload now acts as an on-device controller: status, readable URL, automation/manual toggles, network scan trigger, vulnerability scan trigger, and log view
-- The upstream source lives in [`vendor/ragnar/`](vendor/ragnar/)
-- If the launcher reports missing Python packages, install the optional bridge deps with:
+- `packjack-ap.service`: configures the onboard WiFi AP.
+- `packjack-web.service`: serves the WebUI and HTTP API.
+- `packjack-ws.service`: serves terminal/input/frame WebSocket features.
+- `packjack-pin-wifi.service`: keeps Pi 5 WiFi interface names stable at boot.
 
-```bash
-./scripts/install_ragnar_port.sh
-```
-
----
-
-## 🎮 Input mapping
-
-| Control | Action |
-|---|---|
-| UP / DOWN | Navigate |
-| LEFT | Back |
-| RIGHT / OK | Enter / Select |
-| KEY1 | Context/extra action (varies) |
-| KEY2 | Secondary action (varies) |
-| KEY3 | Exit / Cancel |
----
-
-## 🖥️ Dual-Display Support
-
-RaspyJack supports two LCD screens from the same codebase. The installer asks which screen you have.
-
-| Display | Chip | Resolution | Config value |
-|---------|------|------------|--------------|
-| 1.44" (original) | ST7735S | 128x128 | `ST7735_128` |
-| 1.3" | ST7789 | 240x240 | `ST7789_240` |
-
-To switch screens, change `"type"` in `gui_conf.json` and reboot:
-```json
-"DISPLAY": { "type": "ST7789_240" }
-```
-
----
-
-## 🧩 Creating a Payload
-
-1. Copy `payloads/examples/_payload_template.py` into the appropriate category folder
-2. Use `ScaledDraw` and `scaled_font()` so it works on both screens
-3. Keep `KEY3` as exit button
-4. Add an icon in `menu_icons.json`
-
-### Minimal template
-
-```python
-#!/usr/bin/env python3
-import os, sys, time
-sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..', '..')))
-
-import RPi.GPIO as GPIO
-import LCD_1in44, LCD_Config
-from PIL import Image, ImageDraw, ImageFont
-from payloads._display_helper import ScaledDraw, scaled_font
-from payloads._input_helper import get_button
-
-PINS = {"UP": 6, "DOWN": 19, "LEFT": 5, "RIGHT": 26,
-        "OK": 13, "KEY1": 21, "KEY2": 20, "KEY3": 16}
-GPIO.setmode(GPIO.BCM)
-for pin in PINS.values():
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-LCD = LCD_1in44.LCD()
-LCD.LCD_Init(LCD_1in44.SCAN_DIR_DFT)
-WIDTH, HEIGHT = LCD.width, LCD.height
-font = scaled_font()
-
-try:
-    while True:
-        btn = get_button(PINS, GPIO)
-        if btn == "KEY3":
-            break
-        img = Image.new("RGB", (WIDTH, HEIGHT), "black")
-        d = ScaledDraw(img)
-        d.text((6, 6), "Hello Payload", font=font, fill="#00FF00")
-        LCD.LCD_ShowImage(img, 0, 0)
-        time.sleep(0.05)
-finally:
-    LCD.LCD_Clear()
-    GPIO.cleanup()
-```
-
-### Extensions
-
-Payloads can also import shared helpers from `EXTENSIONS.api` when they need a reusable gate or action.
-
-```python
-from EXTENSIONS.api import WAIT_FOR_PRESENT, REQUIRE_CAPABILITY
-
-try:
-    REQUIRE_CAPABILITY("binary", "bluetoothctl")
-    WAIT_FOR_PRESENT(name="TestRJ", timeout_seconds=30)
-    while True:
-        btn = get_button(PINS, GPIO)
-        if btn == "KEY3":
-            break
-finally:
-    LCD.LCD_Clear()
-    GPIO.cleanup()
-```
-
-These helpers do not change the display model. If a payload draws to the LCD, it should still use `ScaledDraw` and `scaled_font()` so the same code works on both supported screens.
-
----
-
-
-### Adding an icon
-
-Edit `menu_icons.json` and add your payload name in the `payloads` section:
-
-```json
-"payloads": {
-    " my_payload": "\uf002",
-}
-```
-
-Icons are FontAwesome 6 Solid. Browse available icons at https://fontawesome.com/v6/search?o=r&s=solid
-
-### Display rules
-
-- **UI/tool payloads**: Use `ScaledDraw` with 128-base coordinates (0-127). Never use `WIDTH`/`HEIGHT` in draw calls.
-- **Game payloads**: Render at 128x128 with regular `ImageDraw.Draw`, then resize to `(WIDTH, HEIGHT)` before showing.
-
----
-
-## 📦 Project layout
+## Project Layout
 
 ```text
-Raspyjack/
-├── raspyjack.py          # Main UI engine
-├── gui_conf.json          # Display type, colors, pins, lock
-├── menu_icons.json        # FontAwesome icons for menus
-├── LCD_1in44.py           # LCD driver (ST7735 + ST7789)
-├── LCD_Config.py          # SPI/GPIO config
-├── web_server.py          # WebUI HTTP server
-├── device_server.py       # WebSocket device server
-├── rj_input.py            # Input handler
-├── install_raspyjack.sh   # Installer
-├── web/                   # WebUI frontend
-├── payloads/
-│   ├── _display_helper.py # ScaledDraw + scaled_font
-│   ├── _input_helper.py   # GPIO + WebUI input
-│   ├── reconnaissance/    # Nmap, Shodan, OSINT, AP/client stats, flock detection, Norse recon suite, pwnagotchi
-│   ├── wifi/              # Deauth, evil twin, CIW Zeroclick (SSID injection), beacon flood, BLE spam, pwnagotchi
-│   ├── network/           # ARP MITM, DNS spoof, handshake hunter with auto-upload, WPA cracking
-│   ├── credentials/       # Responder, credential capture, hash harvesting
-│   ├── bluetooth/         # Scanner, spam, beacon flood, MITM, replay, audio inject, DoS
-│   ├── usb/               # DuckyScript generator, USB attacks
-│   ├── exfiltration/      # HTTP, DNS, BLE, Discord, SMB, FTP, USB, Dropbox
-│   ├── evasion/           # Evasion techniques
-│   ├── remote_access/     # Reverse shell, Discord C2, HTTPS stealth shell
-│   ├── evil_portal/       # Captive portal with 84 templates, whitelist, SSID editor, credential capture
-│   ├── dead_drop/         # WiFi file sharing with dashboard
-│   ├── utilities/         # Weather, IRC, morse, translator, video player, interface manager, system monitor
-│   ├── hardware/          # Hardware interaction payloads
-│   ├── games/             # 25 games including Pac-Man, Tetris, Tron, LLM adventure, labyrinth
-│   └── examples/          # Payload templates
-├── loot/                  # Captured data
-├── config/                # Payload configs
-├── DNSSpoof/
-├── Responder/
-└── wifi/                  # WiFi manager
+packjack/                 Headless runtime modules and compatibility shims
+web/                      JackPack WebUI
+payloads/                 RaspyJack-compatible payload collection
+extensions/               Reusable payload gates/actions
+wifi/                     WiFi/interface helper modules
+vendor/                   Third-party tools used by payloads
+deploy/systemd/           JackPack services
+deploy/network/           Onboard AP setup
+config/                   Example runtime configuration
+loot/                     Runtime output; ignored except bundled wordlists
 ```
 
----
+## Payload Porting Rules
 
-## 🤝 Contributing
+- Keep payloads in `payloads/<category>/<name>.py`.
+- Put shared helpers in `payloads/_*.py`, `extensions/`, or `packjack/`.
+- Use `JACKPACK_ATTACK_IFACE`, then `PACKJACK_ATTACK_IFACE`, then `wlan1` for WiFi payload work.
+- Use `JACKPACK_WIRED_IFACE`, then `eth0` for wired payload work.
+- Do not use `wlan0` for attacks; it is the phone-control AP.
+- Write output under `loot/<feature>/` so the WebUI can browse it.
+- Prefer non-interactive CLI/API behavior. If a legacy payload still expects LCD/buttons, keep it compatible through `packjack.compat` and mark it as compat.
 
-PRs are welcome.
+## FAQ
 
-If you submit UI changes, please include:
-- short description + screenshots/gifs,
-- any changed routes/workflows,
-- output of `./scripts/check_webui_js.sh`.
+**Why not keep the LCD files in the root?**
 
----
-## 🎬 Community Content
+Because JackPack is headless. Legacy compatibility lives in `packjack/compat/`; the root should describe the product, not the old hardware.
 
-Videos made by the community about RaspyJack:
+**Does `jackpack.local` always work on phones?**
 
-### Videos
+It works on many systems through mDNS/Avahi. If your phone does not resolve `.local`, use the fallback AP address: `http://10.66.0.1:8080`.
 
-<div align="center">
+**Can I still port upstream RaspyJack payloads?**
 
-[![](https://img.youtube.com/vi/i4CnRoA7Mt4/mqdefault.jpg)](https://www.youtube.com/watch?v=i4CnRoA7Mt4)<br>
-**RASPYJACK - A Network Swiss Army Toolkit Based on the Raspberry Pi 2W**<br>
-*Zeek*
+Yes. Keep them under `payloads/`, use the JackPack interface environment variables, and avoid assuming LCD hardware or Pi Zero add-on boards.
 
-[![](https://img.youtube.com/vi/tnyolkq7x8Y/mqdefault.jpg)](https://www.youtube.com/watch?v=tnyolkq7x8Y)<br>
-**Raspyjack - Small Offensive Network Toolkit for Raspberry Pi**<br>
-*HackedExistence*
+## Credits
 
-[![](https://img.youtube.com/vi/YacMgTcv3wY/mqdefault.jpg)](https://www.youtube.com/watch?v=YacMgTcv3wY)<br>
-**Raspyjack DIY Pentesting - Full Guide**<br>
-*Valleytech Custom Solutions*
+JackPack is based on the original **RaspyJack** project by **7h30th3r0n3** and contributors. This fork changes the product direction toward a clean Raspberry Pi 5 headless workflow while preserving as much payload compatibility as practical.
 
-[![](https://img.youtube.com/vi/lhS0trmBAAU/mqdefault.jpg)](https://youtu.be/lhS0trmBAAU?t=388)<br>
-**Linux in your palm / CardputerZero prototype sneak peek**<br>
-*Sn0ren*
+## Disclaimer
 
-[![](https://img.youtube.com/vi/GJaftS1josM/mqdefault.jpg)](https://www.youtube.com/watch?v=GJaftS1josM)<br>
-**Meet The RaspyJack, WiFi 5 GHz And Ethernet!**<br>
-*Adventures of Illya*
+> [!CAUTION]
+> **STRICTLY FOR AUTHORIZED SECURITY TESTING AND RESEARCH**
+>
+> JackPack is an independent project intended for authorized red teaming, internal security testing, lab research, education, and work on systems and networks you own or have explicit written permission to assess.
+>
+> I do **not** condone, encourage, or authorize illegal activity or misuse of this project. Do not use JackPack for unauthorized access, credential theft, persistence on systems you do not own, network disruption, surveillance, vandalism, fraud, or harm of any kind.
+>
+> You are solely responsible for how you use this software and for complying with all applicable laws, contracts, policies, and rules of engagement. The creator and contributors assume no liability for misuse, damage, legal consequences, or third-party claims arising from this project.
 
-[![](https://img.youtube.com/vi/tMegqVVEbhE/mqdefault.jpg)](https://www.youtube.com/watch?v=tMegqVVEbhE)<br>
-**How to Auto Update Your RaspyJack + 135 Brand New Payloads**<br>
-*UAgain Shadow*
+## License
 
-[![](https://img.youtube.com/vi/DtClLoVjn5o/mqdefault.jpg)](https://www.youtube.com/watch?v=DtClLoVjn5o)<br>
-**Raspyjack WebUI Payload Upload SUPER EASY**<br>
-*UAgain Shadow*
-
-[![](https://img.youtube.com/vi/JVVah3QnvH4/mqdefault.jpg)](https://www.youtube.com/watch?v=JVVah3QnvH4)<br>
-**RaspyJack Just Got a MASSIVE Update... 135 NEW Payloads?!**<br>
-*UAgain Shadow*
-
-[![](https://img.youtube.com/vi/WHJHB-T4IsI/mqdefault.jpg)](https://www.youtube.com/watch?v=WHJHB-T4IsI)<br>
-**How to Build a RaspyJack - Complete Guide Pi Zero 2W Setup**<br>
-*UAgain Shadow*
-
-[![](https://img.youtube.com/vi/ebhYca-BVCo/mqdefault.jpg)](https://www.youtube.com/watch?v=ebhYca-BVCo)<br>
-**The M5Stack Cardputer Zero is INSANE For Pentesting**<br>
-*Valleytech Custom Solutions*
-
-[![](https://img.youtube.com/vi/BHkWpldi5hs/mqdefault.jpg)](https://www.youtube.com/watch?v=BHkWpldi5hs)<br>
-**This $22 Adapter Unlocks Hidden Potential in Your RaspyJack**<br>
-*Anubis Darkwatch (The Anubis Project)*
-
-[![](https://img.youtube.com/vi/dv1O_OE2_M4/mqdefault.jpg)](https://www.youtube.com/watch?v=dv1O_OE2_M4)<br>
-**RaspyJack - A Full Featured Network Testing Multi-tool**<br>
-*Anubis Darkwatch (The Anubis Project)*
-
-[![](https://img.youtube.com/vi/Puj0P42V0yI/mqdefault.jpg)](https://www.youtube.com/watch?v=Puj0P42V0yI)<br>
-**RaspyJack project - Watch as I build!**<br>
-*Hackazillarex*
-
-[![](https://img.youtube.com/vi/YRK4447BMrs/mqdefault.jpg)](https://www.youtube.com/watch?v=YRK4447BMrs)<br>
-**RaspyJack offensive tool kit.** - *m0usem0use*
-
-</div>
-
-### Shorts
-
-<div align="center">
-
-[![](https://img.youtube.com/vi/ApOcld565kM/mqdefault.jpg)](https://www.youtube.com/shorts/ApOcld565kM)<br>
-**Best Linux Pentesting Tool 2026** - *Valleytech Custom Solutions*
-
-[![](https://img.youtube.com/vi/knZrws2JcLQ/mqdefault.jpg)](https://www.youtube.com/shorts/knZrws2JcLQ)<br>
-**Raspyjack Pentest Tool** - *Valleytech Custom Solutions*
-
-[![](https://img.youtube.com/vi/p8x7pUi0JKE/mqdefault.jpg)](https://www.youtube.com/shorts/p8x7pUi0JKE)<br>
-**Raspyjack Wardriving** - *Valleytech Custom Solutions*
-
-[![](https://img.youtube.com/vi/4Ab6uLjFpXo/mqdefault.jpg)](https://www.youtube.com/shorts/4Ab6uLjFpXo)<br>
-**Wardriving 2 - Full Build Vid Available Now** - *Valleytech Custom Solutions*
-
-[![](https://img.youtube.com/vi/Ye6zDHK9Diw/mqdefault.jpg)](https://www.youtube.com/shorts/Ye6zDHK9Diw)<br>
-**My Raspyjack Build** - *Valleytech Custom Solutions*
-
-[![](https://img.youtube.com/vi/QMbCb2RfNRI/mqdefault.jpg)](https://www.youtube.com/shorts/QMbCb2RfNRI)<br>
-**RaspyJack X305 & X306** - *Valleytech Custom Solutions*
-
-[![](https://img.youtube.com/vi/yfecCug97tc/mqdefault.jpg)](https://www.youtube.com/shorts/yfecCug97tc)<br>
-**RaspyJack Cardputer Zero** - *Valleytech Custom Solutions*
-
-[![](https://img.youtube.com/vi/7O4izk9IfPA/mqdefault.jpg)](https://www.youtube.com/shorts/7O4izk9IfPA)<br>
-**M5stack Cardputer Zero** - *Valleytech Custom Solutions*
-
-[![](https://img.youtube.com/vi/9VvDdgp-e7c/mqdefault.jpg)](https://www.youtube.com/shorts/9VvDdgp-e7c)<br>
-**Raspy Jack Is Flashed - WebUI feature!** - *Valleytech Custom Solutions*
-
-[![](https://img.youtube.com/vi/__QNkm_jSWM/mqdefault.jpg)](https://www.youtube.com/shorts/__QNkm_jSWM)<br>
-**Major Raspyjack Update** - *Valleytech Custom Solutions*
-
-[![](https://img.youtube.com/vi/kXTqybQdVMM/mqdefault.jpg)](https://www.youtube.com/shorts/kXTqybQdVMM)<br>
-**How to Auto Update Your RaspyJack + 135 Payloads** - *UAgain Shadow*
-
-[![](https://img.youtube.com/vi/iT5EMMX8VBE/mqdefault.jpg)](https://www.youtube.com/shorts/iT5EMMX8VBE)<br>
-**RaspyJack CCTV Viewer** - *Valleytech Custom Solutions*
-
-[![](https://img.youtube.com/vi/nIggdr4mOb4/mqdefault.jpg)](https://www.youtube.com/shorts/nIggdr4mOb4)<br>
-**RaspyJack MAJOR Update!** - *Valleytech Custom Solutions*
-
-</div>
-
----
-
-> 📹 Made a video about RaspyJack? Open an issue or PR to get featured here!
-
----
-
-## 🙏 Acknowledgements
-
-- [@dagnazty](https://github.com/dagnazty)
-- [@Hosseios](https://github.com/Hosseios)
-- [@m0usem0use](https://github.com/m0usem0use)
-
----
-
-<div align="center">
-  Build responsibly. Test ethically. 🧌
-</div>
+Licensed under the **MIT License**. See [`LICENSE`](LICENSE) for details.

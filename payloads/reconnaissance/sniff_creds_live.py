@@ -15,7 +15,7 @@ Auto-refreshes every 10 seconds.
 Setup / Prerequisites
 ---------------------
 - Various RaspyJack attack payloads populate loot directories.
-- Read access to /root/Raspyjack/loot/ and /root/Raspyjack/Responder/logs/.
+- Read access to /root/Raspyjack/loot/ and /root/Raspyjack/vendor/responder/logs/.
 
 Controls
 --------
@@ -37,7 +37,7 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44, LCD_Config
+from packjack.compat import LCD_1in44, LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -63,7 +63,7 @@ LOOT_DIR = "/root/Raspyjack/loot/CredDashboard"
 os.makedirs(LOOT_DIR, exist_ok=True)
 
 SCAN_DIRS = {
-    "Responder":   "/root/Raspyjack/Responder/logs",
+    "Responder":   "/root/Raspyjack/vendor/responder/logs",
     "HTTPCreds":   "/root/Raspyjack/loot/HTTPCreds",
     "CrackedNTLM": "/root/Raspyjack/loot/CrackedNTLM",
     "CrackedWPA":  "/root/Raspyjack/loot/CrackedWPA",

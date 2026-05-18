@@ -30,8 +30,8 @@ from collections import deque, Counter
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -336,7 +336,7 @@ def _list_interfaces():
                 continue
             ifaces.append(name)
     except Exception:
-        ifaces = ["eth0", "wlan0"]
+        ifaces = ["eth0", "wlan1"]
     return sorted(ifaces)
 
 

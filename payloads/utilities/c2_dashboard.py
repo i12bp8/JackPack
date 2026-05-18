@@ -11,7 +11,7 @@ multi-view layout with auto-refresh.
 Setup / Prerequisites
 ---------------------
 - RaspyJack base system with LCD hat.
-- systemd services: raspyjack, raspyjack-device, raspyjack-webui, caddy.
+- systemd services: packjack-ap, packjack-web, packjack-ws.
 - Discord webhook URL in /root/Raspyjack/discord_webhook.txt (optional).
 
 Controls
@@ -33,8 +33,8 @@ import threading
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -54,7 +54,7 @@ font = scaled_font()
 
 LOOT_ROOT = "/root/Raspyjack/loot"
 WEBHOOK_FILE = "/root/Raspyjack/discord_webhook.txt"
-SERVICES = ["raspyjack", "raspyjack-device", "raspyjack-webui", "caddy"]
+SERVICES = ["packjack-ap", "packjack-web", "packjack-ws", "packjack-pin-wifi"]
 VIEWS = ["Overview", "Payloads", "Loot", "Network"]
 REFRESH_INTERVAL = 5.0
 DEBOUNCE = 0.22

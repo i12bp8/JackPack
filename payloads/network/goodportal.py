@@ -32,8 +32,8 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -63,7 +63,7 @@ os.makedirs(LOOT_DIR, exist_ok=True)
 os.makedirs(PORTAL_DIR, exist_ok=True)
 ROW_H = 12
 DEBOUNCE = 0.20
-PORTAL_IFACE = "wlan0"
+PORTAL_IFACE = os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1"))
 PORTAL_IP = "10.0.0.1"
 PORTAL_SUBNET = "10.0.0.0/24"
 PORTAL_RANGE_START = "10.0.0.10"

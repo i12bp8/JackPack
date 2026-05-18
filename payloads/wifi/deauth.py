@@ -29,8 +29,8 @@ import threading
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44
-import LCD_Config
+from packjack.compat import LCD_1in44
+from packjack.compat import LCD_Config
 from PIL import Image, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -158,7 +158,7 @@ def _get_wifi_interface_fallback():
                 return candidates[0]
         except Exception:
             pass
-    return "wlan1"
+    return os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1"))
 
 # ---------------------------------------------------------------------------
 # Shell helpers

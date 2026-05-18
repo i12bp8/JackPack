@@ -21,7 +21,7 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 import RPi.GPIO as GPIO
-import LCD_1in44, LCD_Config
+from packjack.compat import LCD_1in44, LCD_Config
 from PIL import Image, ImageDraw, ImageFont
 from payloads._display_helper import ScaledDraw, scaled_font
 from payloads._input_helper import get_button
@@ -41,7 +41,7 @@ ROW_H = 12
 CONFIG_DIR = "/root/Raspyjack/loot/Triggers"
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 ALERT_LOG_FILE = os.path.join(CONFIG_DIR, "alerts.log")
-RESPONDER_LOG_DIR = "/root/Raspyjack/Responder/logs"
+RESPONDER_LOG_DIR = "/root/Raspyjack/vendor/responder/logs"
 LOOT_DIR = "/root/Raspyjack/loot"
 TRIGGER_NAMES = ["deauth_flood", "client_connected", "mac_trigger", "auth_capture"]
 TRIGGER_LABELS = ["Deauth Flood", "Client Conn", "MAC Trigger", "Auth Capture"]

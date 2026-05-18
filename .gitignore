@@ -1,3 +1,11 @@
 RPi/
 __pycache__/
 gui_conf.json
+discord_webhook.txt
+.webui_auth.json
+.webui_session_secret
+.webui_token
+loot/*
+!loot/.gitkeep
+!loot/wordlists/
+!loot/wordlists/**

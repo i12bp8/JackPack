@@ -1,80 +1,53 @@
 #!/usr/bin/env python3
-"""
-RaspyJack WiFi Manager Payload
-=============================
-Launch the WiFi management interface in RaspyJack
+"""JackPack WiFi manager payload.
 
-BUTTON LAYOUT:
-- Automatic launch of WiFi LCD interface
-- Full WiFi network management
-- Profile creation and connection
-- Interface status and configuration
-
-FEATURES:
-- Scan and connect to WiFi networks
-- Save network profiles with passwords
-- Manage multiple WiFi dongles
-- Interface selection for tools
-- Connection status monitoring
-
-This payload provides complete WiFi management for RaspyJack
-while maintaining full ethernet compatibility.
+This replaces the old LCD WiFi manager launcher with a headless status view.
+The WebUI owns interactive WiFi/AP controls; this payload is useful as a quick
+log/status command from the launchpad.
 """
 
+from __future__ import annotations
+
+import json
 import os
-import sys
 import subprocess
+import sys
+from pathlib import Path
 
-# Add WiFi system to path
-sys.path.append('/root/Raspyjack/wifi/')
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "wifi"))
 
-def main():
-    """Launch the WiFi management interface."""
+
+def _run(args: list[str]) -> str:
     try:
-        print("🌐 Launching RaspyJack WiFi Manager...")
-        print("="*50)
-        
-        # Check if WiFi system is available
-        wifi_interface_path = '/root/Raspyjack/wifi/wifi_lcd_interface.py'
-        
-        if not os.path.exists(wifi_interface_path):
-            print("❌ WiFi management system not found!")
-            print("   Please ensure WiFi system is properly installed.")
-            return False
-        
-        print("📱 Starting WiFi LCD interface...")
-        print("   Use LCD buttons to navigate:")
-        print("   - UP/DOWN: Navigate menus")
-        print("   - CENTER: Select/Confirm") 
-        print("   - KEY1: Quick connect/disconnect")
-        print("   - KEY2: Refresh/Scan")
-        print("   - KEY3: Back/Exit")
-        print("")
-        print("📡 Features available:")
-        print("   - Scan for WiFi networks")
-        print("   - Save network profiles")
-        print("   - Quick connect to saved networks")
-        print("   - Interface configuration")
-        print("   - Connection status monitoring")
-        print("")
-        print("🔄 WiFi + Ethernet dual support")
-        print("   Both interfaces work simultaneously")
-        print("")
-        
-        # Run the WiFi LCD interface
-        result = subprocess.run([
-            'python3', wifi_interface_path
-        ], capture_output=False)
-        
-        print(f"\n📋 WiFi manager exited with code: {result.returncode}")
-        return result.returncode == 0
-        
-    except KeyboardInterrupt:
-        print("\n⏹️  WiFi manager interrupted by user")
-        return True
-    except Exception as e:
-        print(f"❌ Error launching WiFi manager: {e}")
-        return False
+        res = subprocess.run(args, capture_output=True, text=True, timeout=12)
+    except Exception as exc:
+        return f"{args[0]} error: {exc}"
+    return (res.stdout or res.stderr or "").strip()
+
+
+def main() -> int:
+    ap_iface = os.environ.get("JACKPACK_AP_IFACE") or os.environ.get("PACKJACK_AP_IFACE", "wlan0")
+    attack_iface = os.environ.get("JACKPACK_ATTACK_IFACE") or os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1")
+
+    payload = {
+        "ap_iface": ap_iface,
+        "attack_iface": attack_iface,
+        "ip_addr": _run(["ip", "-br", "addr"]),
+        "wifi_devices": _run(["iw", "dev"]),
+        "routes": _run(["ip", "route"]),
+    }
+
+    out_dir = ROOT / "loot" / "network"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "wifi_status.json"
+    out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    print(json.dumps(payload, indent=2))
+    print(f"\nSaved: {out_path}")
+    return 0
+
 
 if __name__ == "__main__":
-    main() 
+    raise SystemExit(main())
+

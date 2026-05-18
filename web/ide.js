@@ -927,7 +927,7 @@
       const body = { path: rel, type };
       if (type === "file") {
         body.content =
-          '#!/usr/bin/env python3\n\n\"\"\"\nRaspyJack payload\n\"\"\"\n\n';
+          '#!/usr/bin/env python3\n\n\"\"\"\nJackPack payload\n\"\"\"\n\n';
       }
       const res = await apiFetch(url, {
         method: "POST",
@@ -1591,732 +1591,287 @@
   }
 
   // =====================================================================
-  //  TEMPLATE DATA (ported from raspyjack-ide-studio/templatesData.ts)
+  //  HEADLESS STARTER TEMPLATE DATA
   // =====================================================================
   const TEMPLATES_DATA = [
     {
-      id: "wifi-scanner",
-      name: "WiFi Scanner",
+      id: "headless-wifi-status",
+      name: "WiFi Interface Status",
       category: "wifi",
-      filename: "wifi_scanner.py",
-      description: "Scan and display nearby WiFi networks with signal strength",
+      filename: "wifi_interface_status.py",
+      description: "Report the JackPack external WiFi adapter state",
       code: `#!/usr/bin/env python3
 """
-RaspyJack WiFi Scanner
-======================
-Scans for nearby WiFi networks and displays them on the LCD.
-Press KEY1 to scan, KEY3 to exit.
+JackPack WiFi Interface Status
+==============================
+Headless starter payload. Writes status to stdout and loot/Generated/.
 """
 
-import os, sys
-sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..')))
-
-import time
-import signal
-import subprocess
-import RPi.GPIO as GPIO
-import LCD_1in44
-from PIL import Image, ImageDraw, ImageFont
-from payloads._input_helper import get_button
-
-# Configuration
-PINS = {"UP": 6, "DOWN": 19, "LEFT": 5, "RIGHT": 26, "OK": 13, "KEY1": 21, "KEY2": 20, "KEY3": 16}
-SCAN_TIMEOUT = 10
-WIFI_INTERFACE = "wlan1"
-
-# GPIO Setup
-GPIO.setmode(GPIO.BCM)
-for pin in PINS.values():
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-# LCD Setup
-LCD = LCD_1in44.LCD()
-LCD.LCD_Init(LCD_1in44.SCAN_DIR_DFT)
-WIDTH, HEIGHT = LCD_1in44.LCD_WIDTH, LCD_1in44.LCD_HEIGHT
-font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 9)
-canvas = Image.new("RGB", (WIDTH, HEIGHT), "black")
-draw = ImageDraw.Draw(canvas)
-
-running = True
-
-def cleanup(*_):
-    global running
-    running = False
-
-signal.signal(signal.SIGINT, cleanup)
-signal.signal(signal.SIGTERM, cleanup)
-
-def show(lines):
-    if isinstance(lines, str):
-        lines = [lines]
-    draw.rectangle((0, 0, WIDTH, HEIGHT), fill="black")
-    y = 5
-    for line in lines[:9]:
-        draw.text((4, y), line[:21], font=font, fill="#00FF00")
-        y += 13
-    LCD.LCD_ShowImage(canvas, 0, 0)
-
-def pressed_button():
-    return get_button(PINS, GPIO)
-
-def scan_networks():
-    show(["Scanning WiFi...", f"Interface: {WIFI_INTERFACE}", f"Timeout: {SCAN_TIMEOUT}s"])
-    subprocess.run("rm -f /tmp/wifi_scan*", shell=True)
-    cmd = f"timeout {SCAN_TIMEOUT} airodump-ng --band abg --output-format csv -w /tmp/wifi_scan {WIFI_INTERFACE}"
-    subprocess.run(cmd, shell=True, capture_output=True)
-    networks = []
-    try:
-        with open('/tmp/wifi_scan-01.csv', 'r') as f:
-            content = f.read()
-        if 'Station MAC' in content:
-            content = content.split('Station MAC')[0]
-        for line in content.split('\\n'):
-            if ',' in line and 'BSSID' not in line:
-                parts = line.split(',')
-                if len(parts) > 13:
-                    essid = parts[13].strip()
-                    power = parts[8].strip()
-                    if essid and power:
-                        networks.append(f"{essid[:14]} {power}dBm")
-    except:
-        pass
-    return networks[:8]
-
-def main():
-    show(["WiFi Scanner Ready", "", "KEY1: Scan Networks", "KEY3: Exit"])
-    while running:
-        btn = pressed_button()
-        if btn == "KEY1":
-            while pressed_button(): time.sleep(0.05)
-            networks = scan_networks()
-            if networks:
-                show(["Networks Found:"] + networks)
-            else:
-                show(["No networks found", "Check interface"])
-            time.sleep(3)
-            show(["WiFi Scanner Ready", "", "KEY1: Scan Networks", "KEY3: Exit"])
-        elif btn == "KEY3":
-            break
-        time.sleep(0.05)
-
-if __name__ == "__main__":
-    try:
-        main()
-    finally:
-        LCD.LCD_Clear()
-        GPIO.cleanup()
-        print("WiFi Scanner: exited cleanly.")
-`,
-    },
-    {
-      id: "ble-scanner",
-      name: "BLE Device Scanner",
-      category: "ble",
-      filename: "ble_scanner.py",
-      description: "Discover nearby Bluetooth Low Energy devices",
-      code: `#!/usr/bin/env python3
-"""
-RaspyJack BLE Scanner
-=====================
-Scans for nearby BLE devices and displays them.
-Press KEY1 to scan, KEY3 to exit.
-"""
-
-import os, sys
-sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..')))
-
-import time
-import signal
-import RPi.GPIO as GPIO
-import LCD_1in44
-from PIL import Image, ImageDraw, ImageFont
-from payloads._input_helper import get_button
-
-PINS = {"UP": 6, "DOWN": 19, "LEFT": 5, "RIGHT": 26, "OK": 13, "KEY1": 21, "KEY2": 20, "KEY3": 16}
-SCAN_DURATION = 10
-
-GPIO.setmode(GPIO.BCM)
-for pin in PINS.values():
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-LCD = LCD_1in44.LCD()
-LCD.LCD_Init(LCD_1in44.SCAN_DIR_DFT)
-WIDTH, HEIGHT = LCD_1in44.LCD_WIDTH, LCD_1in44.LCD_HEIGHT
-font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 9)
-canvas = Image.new("RGB", (WIDTH, HEIGHT), "black")
-draw = ImageDraw.Draw(canvas)
-
-running = True
-
-def cleanup(*_):
-    global running
-    running = False
-
-signal.signal(signal.SIGINT, cleanup)
-signal.signal(signal.SIGTERM, cleanup)
-
-def show(lines):
-    if isinstance(lines, str):
-        lines = [lines]
-    draw.rectangle((0, 0, WIDTH, HEIGHT), fill="black")
-    y = 5
-    for line in lines[:9]:
-        draw.text((4, y), line[:21], font=font, fill="#00FFFF")
-        y += 13
-    LCD.LCD_ShowImage(canvas, 0, 0)
-
-def pressed_button():
-    return get_button(PINS, GPIO)
-
-def scan_ble():
-    show(["Scanning BLE...", f"Duration: {SCAN_DURATION}s"])
-    devices = []
-    try:
-        from bluepy.btle import Scanner, DefaultDelegate
-        class ScanDelegate(DefaultDelegate):
-            def __init__(self):
-                DefaultDelegate.__init__(self)
-        scanner = Scanner().withDelegate(ScanDelegate())
-        found = scanner.scan(SCAN_DURATION)
-        for dev in found:
-            name = dev.getValueText(9) or dev.addr[:8]
-            rssi = dev.rssi
-            devices.append(f"{name[:12]} {rssi}dB")
-    except ImportError:
-        show(["bluepy not found!", "Install with:", "pip3 install bluepy"])
-        time.sleep(3)
-    except Exception as e:
-        show(["Scan error:", str(e)[:18]])
-        time.sleep(2)
-    return devices[:7]
-
-def main():
-    show(["BLE Scanner Ready", "", "KEY1: Scan Devices", "KEY3: Exit"])
-    while running:
-        btn = pressed_button()
-        if btn == "KEY1":
-            while pressed_button(): time.sleep(0.05)
-            devices = scan_ble()
-            if devices:
-                show(["Devices Found:"] + devices)
-            else:
-                show(["No devices found"])
-            time.sleep(3)
-            show(["BLE Scanner Ready", "", "KEY1: Scan Devices", "KEY3: Exit"])
-        elif btn == "KEY3":
-            break
-        time.sleep(0.05)
-
-if __name__ == "__main__":
-    try:
-        main()
-    finally:
-        LCD.LCD_Clear()
-        GPIO.cleanup()
-        print("BLE Scanner: exited cleanly.")
-`,
-    },
-    {
-      id: "network-nmap",
-      name: "Network Nmap Scanner",
-      category: "network",
-      filename: "nmap_scanner.py",
-      description: "Run Nmap scans on the local network with auto-scheduling",
-      code: `#!/usr/bin/env python3
-"""
-RaspyJack Nmap Scanner
-======================
-Run network scans and save results to loot directory.
-KEY1: Run scan now, KEY2: Toggle auto-scan, KEY3: Exit
-"""
-
-import os, sys
-sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..')))
-
-import time
-import signal
-import subprocess
-import threading
-from datetime import datetime
-import RPi.GPIO as GPIO
-import LCD_1in44
-from PIL import Image, ImageDraw, ImageFont
-from payloads._input_helper import get_button
-
-PINS = {"UP": 6, "DOWN": 19, "LEFT": 5, "RIGHT": 26, "OK": 13, "KEY1": 21, "KEY2": 20, "KEY3": 16}
-INTERFACE = "eth0"
-LOOT_DIR = "/root/Raspyjack/loot/Nmap/"
-SCAN_INTERVAL = 3600
-
-os.makedirs(LOOT_DIR, exist_ok=True)
-
-GPIO.setmode(GPIO.BCM)
-for pin in PINS.values():
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-LCD = LCD_1in44.LCD()
-LCD.LCD_Init(LCD_1in44.SCAN_DIR_DFT)
-WIDTH, HEIGHT = LCD_1in44.LCD_WIDTH, LCD_1in44.LCD_HEIGHT
-font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
-canvas = Image.new("RGB", (WIDTH, HEIGHT), "black")
-draw = ImageDraw.Draw(canvas)
-
-running = True
-auto_scan = False
-scan_stop = threading.Event()
-
-def cleanup(*_):
-    global running
-    running = False
-    scan_stop.set()
-
-signal.signal(signal.SIGINT, cleanup)
-signal.signal(signal.SIGTERM, cleanup)
-
-def show(lines):
-    if isinstance(lines, str):
-        lines = [lines]
-    draw.rectangle((0, 0, WIDTH, HEIGHT), fill="black")
-    y = 10
-    for line in lines[:8]:
-        w = draw.textbbox((0, 0), line, font=font)[2]
-        draw.text(((WIDTH - w) // 2, y), line, font=font, fill="#FF6600")
-        y += 14
-    LCD.LCD_ShowImage(canvas, 0, 0)
-
-def pressed_button():
-    return get_button(PINS, GPIO)
-
-def get_target():
-    cmd = f"ip -4 addr show {INTERFACE} | awk '/inet / {{ print $2 }}'"
-    return subprocess.check_output(cmd, shell=True).decode().strip()
-
-def run_scan():
-    target = get_target()
-    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    output = f"{LOOT_DIR}scan_{ts}.txt"
-    xml_output = output.replace(".txt", ".xml")
-    show(["Nmap Scan", "Running...", target])
-    subprocess.run(["nmap", "-T4", "-oN", output, "-oX", xml_output, target], check=True)
-    show(["Scan Complete!", ts])
-    time.sleep(2)
-
-def auto_scan_loop():
-    while not scan_stop.is_set():
-        if auto_scan:
-            run_scan()
-        scan_stop.wait(SCAN_INTERVAL)
-
-def main():
-    global auto_scan
-    thread = threading.Thread(target=auto_scan_loop, daemon=True)
-    thread.start()
-    show(["Nmap Scanner", "", "KEY1: Scan Now", "KEY2: Auto Toggle", "KEY3: Exit"])
-    while running:
-        btn = pressed_button()
-        if btn == "KEY1":
-            while pressed_button(): time.sleep(0.05)
-            run_scan()
-            show(["Nmap Scanner", f"Auto: {'ON' if auto_scan else 'OFF'}", "KEY1: Scan Now", "KEY2: Auto Toggle", "KEY3: Exit"])
-        elif btn == "KEY2":
-            while pressed_button(): time.sleep(0.05)
-            auto_scan = not auto_scan
-            show([f"Auto Scan: {'ON' if auto_scan else 'OFF'}"])
-            time.sleep(1)
-            show(["Nmap Scanner", f"Auto: {'ON' if auto_scan else 'OFF'}", "KEY1: Scan Now", "KEY2: Auto Toggle", "KEY3: Exit"])
-        elif btn == "KEY3":
-            break
-        time.sleep(0.05)
-
-if __name__ == "__main__":
-    try:
-        main()
-    finally:
-        scan_stop.set()
-        LCD.LCD_Clear()
-        GPIO.cleanup()
-        print("Nmap Scanner: exited cleanly.")
-`,
-    },
-    {
-      id: "honeypot-basic",
-      name: "Basic Honeypot",
-      category: "honeypot",
-      filename: "honeypot.py",
-      description: "Listen for connections on common ports and log them",
-      code: `#!/usr/bin/env python3
-"""
-RaspyJack Basic Honeypot
-========================
-Listens on common ports and logs connection attempts.
-"""
-
-import os, sys
-sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..')))
-
-import time
-import signal
-import socket
 import json
-import threading
-from datetime import datetime
-import RPi.GPIO as GPIO
-import LCD_1in44
-from PIL import Image, ImageDraw, ImageFont
-from payloads._input_helper import get_button
-
-PINS = {"UP": 6, "DOWN": 19, "LEFT": 5, "RIGHT": 26, "OK": 13, "KEY1": 21, "KEY2": 20, "KEY3": 16}
-PORTS = [22, 23, 80, 8080]
-LOOT_DIR = "/root/Raspyjack/loot/honeypot/"
-LOG_FILE = LOOT_DIR + "connections.jsonl"
-
-os.makedirs(LOOT_DIR, exist_ok=True)
-
-GPIO.setmode(GPIO.BCM)
-for pin in PINS.values():
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-LCD = LCD_1in44.LCD()
-LCD.LCD_Init(LCD_1in44.SCAN_DIR_DFT)
-WIDTH, HEIGHT = LCD_1in44.LCD_WIDTH, LCD_1in44.LCD_HEIGHT
-font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
-canvas = Image.new("RGB", (WIDTH, HEIGHT), "black")
-draw = ImageDraw.Draw(canvas)
-
-running = True
-connections = []
-
-def cleanup(*_):
-    global running
-    running = False
-
-signal.signal(signal.SIGINT, cleanup)
-signal.signal(signal.SIGTERM, cleanup)
-
-def show(lines):
-    if isinstance(lines, str):
-        lines = [lines]
-    draw.rectangle((0, 0, WIDTH, HEIGHT), fill="black")
-    y = 10
-    for line in lines[:8]:
-        w = draw.textbbox((0, 0), line, font=font)[2]
-        draw.text(((WIDTH - w) // 2, y), line, font=font, fill="#FF0000")
-        y += 14
-    LCD.LCD_ShowImage(canvas, 0, 0)
-
-def pressed_button():
-    return get_button(PINS, GPIO)
-
-def log_connection(port, ip):
-    entry = {"time": datetime.now().isoformat(), "port": port, "ip": ip}
-    connections.append(entry)
-    with open(LOG_FILE, 'a') as f:
-        f.write(json.dumps(entry) + "\\n")
-
-def port_listener(port):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    try:
-        sock.bind(('0.0.0.0', port))
-        sock.listen(5)
-        sock.settimeout(1)
-        while running:
-            try:
-                conn, addr = sock.accept()
-                log_connection(port, addr[0])
-                conn.close()
-            except socket.timeout:
-                pass
-    except Exception as e:
-        print(f"Port {port}: {e}")
-    finally:
-        sock.close()
-
-def main():
-    show(["Honeypot Starting", f"Ports: {len(PORTS)}"])
-    for port in PORTS:
-        t = threading.Thread(target=port_listener, args=(port,), daemon=True)
-        t.start()
-    time.sleep(1)
-    while running:
-        btn = pressed_button()
-        if btn == "KEY3":
-            break
-        show(["Honeypot Active", f"Ports: {', '.join(map(str, PORTS))}", f"Hits: {len(connections)}", "", "KEY3: Exit"])
-        time.sleep(1)
-
-if __name__ == "__main__":
-    try:
-        main()
-    finally:
-        LCD.LCD_Clear()
-        GPIO.cleanup()
-        print(f"Honeypot: exited. {len(connections)} connections logged.")
-`,
-    },
-    {
-      id: "utility-menu",
-      name: "Menu Template",
-      category: "utility",
-      filename: "menu_template.py",
-      description: "Basic menu navigation template with LCD and buttons",
-      code: `#!/usr/bin/env python3
-"""
-RaspyJack Menu Template
-=======================
-A basic menu navigation template with multiple screens.
-"""
-
-import os, sys
-sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..')))
-
-import time
-import signal
-import RPi.GPIO as GPIO
-import LCD_1in44
-from PIL import Image, ImageDraw, ImageFont
-from payloads._input_helper import get_button
-
-PINS = {"UP": 6, "DOWN": 19, "LEFT": 5, "RIGHT": 26, "OK": 13, "KEY1": 21, "KEY2": 20, "KEY3": 16}
-
-MENU_ITEMS = ["Option 1", "Option 2", "Option 3", "Option 4", "Exit"]
-
-GPIO.setmode(GPIO.BCM)
-for pin in PINS.values():
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-LCD = LCD_1in44.LCD()
-LCD.LCD_Init(LCD_1in44.SCAN_DIR_DFT)
-WIDTH, HEIGHT = LCD_1in44.LCD_WIDTH, LCD_1in44.LCD_HEIGHT
-font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
-canvas = Image.new("RGB", (WIDTH, HEIGHT), "black")
-draw = ImageDraw.Draw(canvas)
-
-running = True
-selected = 0
-
-def cleanup(*_):
-    global running
-    running = False
-
-signal.signal(signal.SIGINT, cleanup)
-signal.signal(signal.SIGTERM, cleanup)
-
-def show_menu():
-    draw.rectangle((0, 0, WIDTH, HEIGHT), fill="black")
-    draw.text((4, 4), "== MENU ==", font=font, fill="#00FF00")
-    y = 24
-    for i, item in enumerate(MENU_ITEMS):
-        if i == selected:
-            draw.rectangle((2, y-2, WIDTH-2, y+12), outline="#00FF00")
-            draw.text((8, y), f"> {item}", font=font, fill="#00FF00")
-        else:
-            draw.text((8, y), f"  {item}", font=font, fill="#888888")
-        y += 16
-    LCD.LCD_ShowImage(canvas, 0, 0)
-
-def show_action(text):
-    draw.rectangle((0, 0, WIDTH, HEIGHT), fill="black")
-    w = draw.textbbox((0, 0), text, font=font)[2]
-    draw.text(((WIDTH - w) // 2, HEIGHT // 2 - 7), text, font=font, fill="#FFFF00")
-    LCD.LCD_ShowImage(canvas, 0, 0)
-
-def pressed_button():
-    return get_button(PINS, GPIO)
-
-def handle_selection():
-    global running
-    item = MENU_ITEMS[selected]
-    if item == "Exit":
-        running = False
-        return
-    show_action(f"Running: {item}")
-    time.sleep(2)
-
-def main():
-    global selected
-    show_menu()
-    while running:
-        btn = pressed_button()
-        if btn == "UP":
-            while pressed_button(): time.sleep(0.05)
-            selected = (selected - 1) % len(MENU_ITEMS)
-            show_menu()
-        elif btn == "DOWN":
-            while pressed_button(): time.sleep(0.05)
-            selected = (selected + 1) % len(MENU_ITEMS)
-            show_menu()
-        elif btn == "OK" or btn == "KEY1":
-            while pressed_button(): time.sleep(0.05)
-            handle_selection()
-            if running:
-                show_menu()
-        elif btn == "KEY3":
-            break
-        time.sleep(0.05)
-
-if __name__ == "__main__":
-    try:
-        main()
-    finally:
-        LCD.LCD_Clear()
-        GPIO.cleanup()
-        print("Menu Template: exited cleanly.")
-`,
-    },
-    {
-      id: "utility-status",
-      name: "System Status Display",
-      category: "utility",
-      filename: "system_status.py",
-      description: "Display system stats like CPU, memory, and network",
-      code: `#!/usr/bin/env python3
-"""
-RaspyJack System Status
-=======================
-Display CPU, memory, disk, and network information.
-"""
-
-import os, sys
-sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..')))
-
-import time
+import os
 import signal
 import subprocess
-import RPi.GPIO as GPIO
-import LCD_1in44
-from PIL import Image, ImageDraw, ImageFont
-from payloads._input_helper import get_button
+import sys
+import time
+from pathlib import Path
 
-PINS = {"UP": 6, "DOWN": 19, "LEFT": 5, "RIGHT": 26, "OK": 13, "KEY1": 21, "KEY2": 20, "KEY3": 16}
-
-GPIO.setmode(GPIO.BCM)
-for pin in PINS.values():
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-LCD = LCD_1in44.LCD()
-LCD.LCD_Init(LCD_1in44.SCAN_DIR_DFT)
-WIDTH, HEIGHT = LCD_1in44.LCD_WIDTH, LCD_1in44.LCD_HEIGHT
-font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 9)
-canvas = Image.new("RGB", (WIDTH, HEIGHT), "black")
-draw = ImageDraw.Draw(canvas)
-
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.append(str(ROOT))
+LOOT_ROOT = Path(os.environ.get("JACKPACK_LOOT_DIR", str(ROOT / "loot")))
+LOOT_DIR = LOOT_ROOT / "Generated" / Path(__file__).stem
+STATUS_FILE = LOOT_DIR / "status.json"
+LOOT_DIR.mkdir(parents=True, exist_ok=True)
+ATTACK_IFACE = os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1"))
 running = True
 
-def cleanup(*_):
+
+def stop(*_):
     global running
     running = False
 
-signal.signal(signal.SIGINT, cleanup)
-signal.signal(signal.SIGTERM, cleanup)
 
-def get_cpu_temp():
-    try:
-        temp = subprocess.check_output(["vcgencmd", "measure_temp"]).decode()
-        return temp.replace("temp=", "").strip()
-    except:
-        return "N/A"
+signal.signal(signal.SIGINT, stop)
+signal.signal(signal.SIGTERM, stop)
 
-def get_cpu_usage():
-    try:
-        usage = subprocess.check_output(["top", "-bn1"]).decode()
-        for line in usage.split("\\n"):
-            if "Cpu(s)" in line or "%Cpu" in line:
-                parts = line.split()
-                for i, p in enumerate(parts):
-                    if "id" in p or "idle" in parts[i+1:i+2]:
-                        idle = float(parts[i-1].replace(",", "."))
-                        return f"{100 - idle:.1f}%"
-        return "N/A"
-    except:
-        return "N/A"
 
-def get_memory():
-    try:
-        mem = subprocess.check_output(["free", "-m"]).decode()
-        for line in mem.split("\\n"):
-            if "Mem:" in line:
-                parts = line.split()
-                total = int(parts[1])
-                used = int(parts[2])
-                return f"{used}MB / {total}MB"
-        return "N/A"
-    except:
-        return "N/A"
+def run(cmd):
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
-def get_disk():
-    try:
-        disk = subprocess.check_output(["df", "-h", "/"]).decode()
-        for line in disk.split("\\n"):
-            if "/" in line:
-                parts = line.split()
-                return f"{parts[2]} / {parts[1]}"
-        return "N/A"
-    except:
-        return "N/A"
 
-def get_ip():
-    try:
-        ip = subprocess.check_output(["hostname", "-I"]).decode().strip()
-        return ip.split()[0] if ip else "No IP"
-    except:
-        return "N/A"
-
-def show_status():
-    draw.rectangle((0, 0, WIDTH, HEIGHT), fill="black")
-    lines = [
-        "== SYSTEM STATUS ==",
-        f"CPU: {get_cpu_usage()}",
-        f"Temp: {get_cpu_temp()}",
-        f"Mem: {get_memory()}",
-        f"Disk: {get_disk()}",
-        f"IP: {get_ip()}",
-        "",
-        "KEY3: Exit"
-    ]
-    y = 4
+def write_status(lines):
+    payload = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "iface": ATTACK_IFACE, "lines": lines}
+    STATUS_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     for line in lines:
-        color = "#00FF00" if "==" in line else "#AAFFAA"
-        draw.text((4, y), line, font=font, fill=color)
-        y += 14
-    LCD.LCD_ShowImage(canvas, 0, 0)
+        print(line, flush=True)
 
-def pressed_button():
-    return get_button(PINS, GPIO)
 
 def main():
     while running:
-        show_status()
-        for _ in range(20):
-            if not running:
-                break
-            btn = pressed_button()
-            if btn == "KEY3":
-                return
-            time.sleep(0.1)
+        link = run(["ip", "-brief", "link", "show", ATTACK_IFACE])
+        addr = run(["ip", "-brief", "addr", "show", ATTACK_IFACE])
+        lines = [
+            "WiFi adapter status",
+            f"Interface: {ATTACK_IFACE}",
+            link.stdout.strip() or link.stderr.strip() or "link: unavailable",
+            addr.stdout.strip() or "addr: none",
+        ]
+        write_status(lines)
+        time.sleep(5)
+
 
 if __name__ == "__main__":
-    try:
-        main()
-    finally:
-        LCD.LCD_Clear()
-        GPIO.cleanup()
-        print("System Status: exited cleanly.")
+    main()
+`,
+    },
+    {
+      id: "headless-wired-scout",
+      name: "Wired Gateway Scout",
+      category: "network",
+      filename: "wired_gateway_scout.py",
+      description: "Check the Pi 5 Ethernet target interface and default gateway",
+      code: `#!/usr/bin/env python3
+"""
+JackPack Wired Gateway Scout
+============================
+Headless starter payload for eth0-oriented wired checks.
+"""
+
+import json
+import os
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.append(str(ROOT))
+LOOT_ROOT = Path(os.environ.get("JACKPACK_LOOT_DIR", str(ROOT / "loot")))
+LOOT_DIR = LOOT_ROOT / "Generated" / Path(__file__).stem
+STATUS_FILE = LOOT_DIR / "status.json"
+LOOT_DIR.mkdir(parents=True, exist_ok=True)
+WIRED_IFACE = os.environ.get("JACKPACK_WIRED_IFACE", os.environ.get("PACKJACK_WIRED_IFACE", "eth0"))
+running = True
+
+
+def stop(*_):
+    global running
+    running = False
+
+
+signal.signal(signal.SIGINT, stop)
+signal.signal(signal.SIGTERM, stop)
+
+
+def run(cmd):
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+
+
+def write_status(lines):
+    payload = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "iface": WIRED_IFACE, "lines": lines}
+    STATUS_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    for line in lines:
+        print(line, flush=True)
+
+
+def default_route():
+    route = run(["ip", "route", "show", "default", "dev", WIRED_IFACE])
+    parts = route.stdout.split()
+    return parts[2] if len(parts) >= 3 and parts[0] == "default" and parts[1] == "via" else ""
+
+
+def main():
+    while running:
+        addr = run(["ip", "-brief", "addr", "show", WIRED_IFACE])
+        gateway = default_route()
+        lines = ["Wired target interface", f"Interface: {WIRED_IFACE}", addr.stdout.strip() or "addr: none"]
+        if gateway:
+            ping = run(["ping", "-c", "1", "-W", "2", gateway])
+            lines.extend([f"Gateway: {gateway}", "Gateway reachable" if ping.returncode == 0 else "Gateway not reachable"])
+        else:
+            lines.append("Gateway: none")
+        write_status(lines)
+        time.sleep(10)
+
+
+if __name__ == "__main__":
+    main()
+`,
+    },
+    {
+      id: "headless-loot-writer",
+      name: "Loot Writer",
+      category: "utility",
+      filename: "loot_writer.py",
+      description: "Minimal headless payload that writes structured loot",
+      code: `#!/usr/bin/env python3
+"""
+JackPack Loot Writer
+====================
+Small contribution template for payloads that produce files under loot/.
+"""
+
+import json
+import os
+import signal
+import sys
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.append(str(ROOT))
+LOOT_ROOT = Path(os.environ.get("JACKPACK_LOOT_DIR", str(ROOT / "loot")))
+LOOT_DIR = LOOT_ROOT / "Generated" / Path(__file__).stem
+STATUS_FILE = LOOT_DIR / "status.json"
+EVENTS_FILE = LOOT_DIR / "events.jsonl"
+LOOT_DIR.mkdir(parents=True, exist_ok=True)
+running = True
+
+
+def stop(*_):
+    global running
+    running = False
+
+
+signal.signal(signal.SIGINT, stop)
+signal.signal(signal.SIGTERM, stop)
+
+
+def write_status(lines):
+    STATUS_FILE.write_text(json.dumps({"time": time.time(), "lines": lines}, indent=2), encoding="utf-8")
+    for line in lines:
+        print(line, flush=True)
+
+
+def record(event):
+    with EVENTS_FILE.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(event) + "\n")
+
+
+def main():
+    counter = 0
+    while running:
+        counter += 1
+        event = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "counter": counter}
+        record(event)
+        write_status(["Loot writer active", f"Events: {counter}", str(EVENTS_FILE)])
+        time.sleep(5)
+
+
+if __name__ == "__main__":
+    main()
+`,
+    },
+    {
+      id: "headless-api-ready",
+      name: "API Ready Payload",
+      category: "utility",
+      filename: "api_ready_payload.py",
+      description: "Clean starter for WebUI-driven payload work",
+      code: `#!/usr/bin/env python3
+"""
+JackPack API Ready Payload
+==========================
+Use this as the starting point for payloads controlled from the WebUI.
+"""
+
+import json
+import os
+import signal
+import sys
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.append(str(ROOT))
+LOOT_ROOT = Path(os.environ.get("JACKPACK_LOOT_DIR", str(ROOT / "loot")))
+LOOT_DIR = LOOT_ROOT / "Generated" / Path(__file__).stem
+STATUS_FILE = LOOT_DIR / "status.json"
+LOOT_DIR.mkdir(parents=True, exist_ok=True)
+running = True
+
+
+def stop(*_):
+    global running
+    running = False
+
+
+signal.signal(signal.SIGINT, stop)
+signal.signal(signal.SIGTERM, stop)
+
+
+def status(state, detail=""):
+    payload = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "state": state, "detail": detail}
+    STATUS_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(f"{state}: {detail}", flush=True)
+
+
+def setup():
+    status("setup", "ready")
+
+
+def tick():
+    status("running", "heartbeat")
+
+
+def teardown():
+    status("stopped", "clean exit")
+
+
+def main():
+    setup()
+    while running:
+        tick()
+        time.sleep(10)
+    teardown()
+
+
+if __name__ == "__main__":
+    main()
 `,
     },
   ];
 
-  const TEMPLATE_CATEGORIES = [
-    { id: "wifi", name: "WiFi", icon: "fa-solid fa-wifi" },
-    { id: "ble", name: "BLE", icon: "fa-brands fa-bluetooth-b" },
-    { id: "network", name: "Network", icon: "fa-solid fa-network-wired" },
-    { id: "honeypot", name: "Honeypot", icon: "fa-solid fa-shield-halved" },
-    { id: "utility", name: "Utility", icon: "fa-solid fa-wrench" },
-  ];
-
-  // =====================================================================
-  //  PAYLOAD WIZARD (ported from raspyjack-ide-studio/PayloadWizard.tsx)
-  // =====================================================================
   const WIZARD_TYPES = [
     {
       id: "wifi",
@@ -2346,7 +1901,7 @@ if __name__ == "__main__":
       id: "utility",
       name: "Utility",
       icon: "fa-solid fa-wrench",
-      description: "Custom tool with LCD/buttons",
+      description: "Custom headless utility with status output",
     },
   ];
 
@@ -2362,8 +1917,8 @@ if __name__ == "__main__":
     networkInterface: "eth0",
     honeypotPorts: "22, 23, 80, 8080",
     honeypotDiscord: false,
-    utilityLcd: true,
-    utilityButtons: true,
+    utilityLcd: false,
+    utilityButtons: false,
   };
 
   const wizardModal = document.getElementById("wizardModal");
@@ -2393,8 +1948,8 @@ if __name__ == "__main__":
       networkInterface: "eth0",
       honeypotPorts: "22, 23, 80, 8080",
       honeypotDiscord: false,
-      utilityLcd: true,
-      utilityButtons: true,
+      utilityLcd: false,
+      utilityButtons: false,
     };
     renderWizardStep();
     if (wizardModal) wizardModal.classList.remove("hidden");
@@ -2492,14 +2047,9 @@ if __name__ == "__main__":
           </label>`;
       } else {
         fields += `
-          <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-            <input type="checkbox" id="wizCfgUtilLcd" ${wizardConfig.utilityLcd ? "checked" : ""} class="rounded border-slate-600">
-            Include LCD display helpers
-          </label>
-          <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-            <input type="checkbox" id="wizCfgUtilBtns" ${wizardConfig.utilityButtons ? "checked" : ""} class="rounded border-slate-600">
-            Include button handling
-          </label>`;
+          <div class="rounded-lg border border-slate-800/70 bg-slate-900/40 p-3 text-xs text-slate-400">
+            Generated JackPack payloads are headless by default. They write stdout plus a small status JSON file under <code class="font-mono text-slate-200">loot/Generated/&lt;payload&gt;/</code>, and the WebUI stops them by terminating the process.
+          </div>`;
       }
       fields += "</div>";
       wizardStepContent.innerHTML = fields;
@@ -2558,63 +2108,44 @@ if __name__ == "__main__":
   }
 
   function generatePayloadCode(cfg) {
+    const payloadNameLiteral = JSON.stringify(cfg.name);
     const imports = [
       "#!/usr/bin/env python3",
       '"""',
-      `RaspyJack Payload - ${cfg.name}`,
-      "Generated by Raspyjack IDE Studio",
+      "JackPack Payload",
+      "Generated by JackPack IDE Studio",
       '"""',
       "",
-      "# Allow imports of RaspyJack helper modules",
-      "import os, sys",
-      "sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..')))",
-      "",
+      "# Allow imports of JackPack helper modules",
+      "import os",
+      "import sys",
+      "import json",
       "import time",
       "import signal",
-      "from payloads._input_helper import get_button",
+      "from pathlib import Path",
+      "",
+      "ROOT = Path(__file__).resolve().parents[2]",
+      "sys.path.append(str(ROOT))",
+      `PAYLOAD_NAME = ${payloadNameLiteral}`,
+      'LOOT_ROOT = Path(os.environ.get("JACKPACK_LOOT_DIR", str(ROOT / "loot")))',
+      'LOOT_DIR = LOOT_ROOT / "Generated" / Path(__file__).stem',
+      'STATUS_FILE = LOOT_DIR / "status.json"',
+      "LOOT_DIR.mkdir(parents=True, exist_ok=True)",
     ].join("\n");
 
-    const gpioSetup = `
-# GPIO Configuration (BCM numbering)
-import RPi.GPIO as GPIO
-PINS = {
-    "UP": 6, "DOWN": 19, "LEFT": 5, "RIGHT": 26,
-    "OK": 13, "KEY1": 21, "KEY2": 20, "KEY3": 16,
-}
-GPIO.setmode(GPIO.BCM)
-for pin in PINS.values():
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-`;
-
-    const lcdSetup = `
-# LCD Initialization
-import LCD_1in44, LCD_Config
-from PIL import Image, ImageDraw, ImageFont
-
-LCD = LCD_1in44.LCD()
-LCD.LCD_Init(LCD_1in44.SCAN_DIR_DFT)
-WIDTH, HEIGHT = LCD_1in44.LCD_WIDTH, LCD_1in44.LCD_HEIGHT
-font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
-canvas = Image.new("RGB", (WIDTH, HEIGHT), "black")
-draw = ImageDraw.Draw(canvas)
-
+    const statusHelpers = `
 def show(lines):
-    """Display text on LCD."""
+    """Write readable status for the WebUI log view and loot browser."""
     if isinstance(lines, str):
         lines = [lines]
-    draw.rectangle((0, 0, WIDTH, HEIGHT), fill="black")
-    y = 10
-    for line in lines:
-        w = draw.textbbox((0, 0), line, font=font)[2]
-        draw.text(((WIDTH - w) // 2, y), line, font=font, fill="#00FF00")
-        y += 14
-    LCD.LCD_ShowImage(canvas, 0, 0)
-`;
-
-    const buttonHelper = `
-def pressed_button():
-    """Return merged WebUI/GPIO button input."""
-    return get_button(PINS, GPIO)
+    payload = {
+        "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "payload": PAYLOAD_NAME,
+        "lines": [str(line) for line in lines],
+    }
+    STATUS_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    for line in payload["lines"]:
+        print(line, flush=True)
 `;
 
     const cleanupHandler = `
@@ -2634,36 +2165,41 @@ signal.signal(signal.SIGTERM, cleanup)
       typeCode = `
 # WiFi Configuration
 SCAN_TIMEOUT = ${cfg.wifiScanTimeout || 15}
-WIFI_INTERFACE = "wlan1"  # External WiFi dongle recommended
+WIFI_INTERFACE = os.environ.get("JACKPACK_ATTACK_IFACE", os.environ.get("PACKJACK_ATTACK_IFACE", "wlan1"))
 ${cfg.wifiDeauth ? "DEAUTH_ENABLED = True" : "DEAUTH_ENABLED = False"}
 
 def scan_networks():
     """Scan for WiFi networks."""
     import subprocess
     show(["Scanning WiFi...", f"Timeout: {SCAN_TIMEOUT}s"])
-    cmd = f"timeout {SCAN_TIMEOUT} airodump-ng --band abg --output-format csv -w /tmp/scan {WIFI_INTERFACE}"
-    subprocess.run(cmd, shell=True, capture_output=True)
+    cmd = ["timeout", str(SCAN_TIMEOUT), "airodump-ng", "--band", "abg", "--output-format", "csv", "-w", "/tmp/jackpack_scan", WIFI_INTERFACE]
+    subprocess.run(["rm", "-f", "/tmp/jackpack_scan-01.csv"], capture_output=True)
+    subprocess.run(cmd, capture_output=True)
     networks = []
     try:
-        with open('/tmp/scan-01.csv', 'r') as f:
-            pass
-    except:
+        content = Path("/tmp/jackpack_scan-01.csv").read_text(encoding="utf-8", errors="ignore")
+        if "Station MAC" in content:
+            content = content.split("Station MAC", 1)[0]
+        for line in content.splitlines():
+            if "," not in line or "BSSID" in line:
+                continue
+            parts = [part.strip() for part in line.split(",")]
+            if len(parts) > 13 and parts[13]:
+                networks.append(f"{parts[13][:24]} {parts[8]}dBm")
+    except Exception as exc:
+        show([f"Scan parse failed: {exc}"])
         pass
-    return networks
+    return networks[:20]
 
 def main():
-    show(["WiFi Tool Ready", "KEY1: Scan", "KEY3: Exit"])
+    show(["WiFi scan starting", f"Interface: {WIFI_INTERFACE}"])
+    networks = scan_networks()
+    if networks:
+        show(["Networks found:"] + networks)
+    else:
+        show(["No networks found", "Check adapter/monitor mode"])
     while running:
-        btn = pressed_button()
-        if btn == "KEY1":
-            while pressed_button(): time.sleep(0.05)
-            networks = scan_networks()
-            show([f"Found {len(networks)} networks"])
-            time.sleep(2)
-            show(["WiFi Tool Ready", "KEY1: Scan", "KEY3: Exit"])
-        elif btn == "KEY3":
-            break
-        time.sleep(0.05)
+        time.sleep(1)
 `;
     } else if (cfg.type === "ble") {
       typeCode = `
@@ -2688,28 +2224,21 @@ def scan_ble_devices():
     return devices
 
 def main():
-    show(["BLE Tool Ready", "KEY1: Scan", "KEY3: Exit"])
+    show(["BLE scan starting"])
+    devices = scan_ble_devices()
+    show([f"Found {len(devices)} BLE devices"])
     while running:
-        btn = pressed_button()
-        if btn == "KEY1":
-            while pressed_button(): time.sleep(0.05)
-            devices = scan_ble_devices()
-            show([f"Found {len(devices)} devices"])
-            time.sleep(2)
-            show(["BLE Tool Ready", "KEY1: Scan", "KEY3: Exit"])
-        elif btn == "KEY3":
-            break
-        time.sleep(0.05)
+        time.sleep(1)
 `;
     } else if (cfg.type === "network") {
       typeCode = `
 # Network Configuration
-INTERFACE = "${cfg.networkInterface || "eth0"}"
+INTERFACE = os.environ.get("JACKPACK_WIRED_IFACE", os.environ.get("PACKJACK_WIRED_IFACE", "${cfg.networkInterface || "eth0"}"))
 ${cfg.networkNmap ? "NMAP_ENABLED = True" : "NMAP_ENABLED = False"}
-LOOT_DIR = "/root/Raspyjack/loot/Network/"
+NETWORK_LOOT_DIR = LOOT_ROOT / "Network"
 
 import subprocess
-os.makedirs(LOOT_DIR, exist_ok=True)
+NETWORK_LOOT_DIR.mkdir(parents=True, exist_ok=True)
 
 def get_local_ip():
     """Get local IP address."""
@@ -2720,37 +2249,34 @@ def run_nmap_scan():
     """Run Nmap scan on local network."""
     target = get_local_ip()
     ts = time.strftime("%Y-%m-%d_%H-%M-%S")
-    output = f"{LOOT_DIR}scan_{ts}.txt"
-    xml_output = output.replace(".txt", ".xml")
+    output = NETWORK_LOOT_DIR / f"scan_{ts}.txt"
+    xml_output = NETWORK_LOOT_DIR / f"scan_{ts}.xml"
     show(["Nmap Scan", "In progress..."])
-    subprocess.run(["nmap", "-T4", "-oN", output, "-oX", xml_output, target], check=True)
+    subprocess.run(["nmap", "-T4", "-oN", str(output), "-oX", str(xml_output), target], check=True)
     show(["Scan complete!", ts])
     time.sleep(2)
 
 def main():
-    show(["Network Tool", "KEY1: Nmap Scan", "KEY3: Exit"])
+    show(["Network tool starting", f"Interface: {INTERFACE}"])
+    if NMAP_ENABLED:
+        run_nmap_scan()
+    else:
+        show(["Nmap disabled"])
     while running:
-        btn = pressed_button()
-        if btn == "KEY1":
-            while pressed_button(): time.sleep(0.05)
-            run_nmap_scan()
-            show(["Network Tool", "KEY1: Nmap Scan", "KEY3: Exit"])
-        elif btn == "KEY3":
-            break
-        time.sleep(0.05)
+        time.sleep(1)
 `;
     } else if (cfg.type === "honeypot") {
       typeCode = `
 # Honeypot Configuration
 PORTS = [${cfg.honeypotPorts || "22, 23, 80, 8080"}]
 ${cfg.honeypotDiscord ? "DISCORD_ENABLED = True" : "DISCORD_ENABLED = False"}
-LOOT_DIR = "/root/Raspyjack/loot/honeypot/"
-LOG_FILE = LOOT_DIR + "connections.jsonl"
+HONEYPOT_LOOT_DIR = LOOT_ROOT / "honeypot"
+LOG_FILE = HONEYPOT_LOOT_DIR / "connections.jsonl"
 
 import socket
 import json
 import threading
-os.makedirs(LOOT_DIR, exist_ok=True)
+HONEYPOT_LOOT_DIR.mkdir(parents=True, exist_ok=True)
 
 connections = []
 
@@ -2758,8 +2284,9 @@ def log_connection(port, ip):
     """Log a connection attempt."""
     entry = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "port": port, "ip": ip}
     connections.append(entry)
-    with open(LOG_FILE, 'a') as f:
+    with LOG_FILE.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\\n")
+    show([f"Connection on {port}", ip, f"Total: {len(connections)}"])
 
 def honeypot_listener(port):
     """Listen on a single port."""
@@ -2783,41 +2310,23 @@ def honeypot_listener(port):
 
 def main():
     show(["Honeypot Starting", f"Ports: {len(PORTS)}"])
-    threads = []
     for port in PORTS:
         t = threading.Thread(target=honeypot_listener, args=(port,), daemon=True)
         t.start()
-        threads.append(t)
-    show(["Honeypot Active", f"Connections: 0", "KEY3: Exit"])
+    show(["Honeypot Active", "Stop from WebUI"])
     while running:
-        btn = pressed_button()
-        if btn == "KEY3":
-            break
-        show(["Honeypot Active", f"Connections: {len(connections)}", "KEY3: Exit"])
-        time.sleep(1)
+        time.sleep(5)
+        show(["Honeypot Active", f"Connections: {len(connections)}"])
 `;
     } else {
       typeCode = `
 # Custom Utility Payload
 def main():
-    show(["Utility Ready", "KEY1: Action 1", "KEY2: Action 2", "KEY3: Exit"])
+    show(["Utility started", "Stop from WebUI"])
     while running:
-        btn = pressed_button()
-        if btn == "KEY1":
-            while pressed_button(): time.sleep(0.05)
-            show(["Action 1", "Executing..."])
-            # TODO: Add your action here
-            time.sleep(2)
-            show(["Utility Ready", "KEY1: Action 1", "KEY2: Action 2", "KEY3: Exit"])
-        elif btn == "KEY2":
-            while pressed_button(): time.sleep(0.05)
-            show(["Action 2", "Executing..."])
-            # TODO: Add your action here
-            time.sleep(2)
-            show(["Utility Ready", "KEY1: Action 1", "KEY2: Action 2", "KEY3: Exit"])
-        elif btn == "KEY3":
-            break
-        time.sleep(0.05)
+        # TODO: Add your headless action here.
+        show(["Utility heartbeat"])
+        time.sleep(10)
 `;
     }
 
@@ -2826,15 +2335,11 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        LCD.LCD_Clear()
-        GPIO.cleanup()
-        print("${cfg.name}: exited cleanly.")
+        print(f"{PAYLOAD_NAME}: exited cleanly.")
 `;
     return [
       imports,
-      gpioSetup,
-      lcdSetup,
-      buttonHelper,
+      statusHelpers,
       cleanupHandler,
       typeCode,
       mainBlock,

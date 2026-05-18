@@ -29,7 +29,7 @@ sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 try:
     import RPi.GPIO as GPIO
-    import LCD_1in44
+    from packjack.compat import LCD_1in44
     from PIL import Image, ImageDraw, ImageFont
     from payloads._display_helper import ScaledDraw, scaled_font
 
@@ -1138,7 +1138,7 @@ def main() -> None:
 
     # Let user select BT adapter
     if LCD_AVAILABLE and LCD_1in44:
-        import LCD_Config as _LC
+        from packjack.compat import LCD_Config as _LC
         _LC.GPIO_Init()
         _lcd = LCD_1in44.LCD()
         _lcd.LCD_Init(LCD_1in44.SCAN_DIR_DFT)

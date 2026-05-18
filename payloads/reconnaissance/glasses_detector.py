@@ -47,7 +47,7 @@ sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
 
 try:
     import RPi.GPIO as GPIO
-    import LCD_1in44
+    from packjack.compat import LCD_1in44
     from PIL import Image, ImageFont
     from payloads._display_helper import ScaledDraw, scaled_font
 
