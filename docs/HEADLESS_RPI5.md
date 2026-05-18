@@ -45,6 +45,7 @@ interface. Override it with `JACKPACK_WIRED_IFACE` only for unusual hardware.
 sudo -i
 git clone <your-fork-url> /root/JackPack
 cd /root/JackPack
+chmod +x scripts/install_packjack_rpi5.sh
 ./scripts/install_packjack_rpi5.sh
 reboot
 ```
@@ -66,6 +67,7 @@ link to the JackPack install directory so legacy payload paths still resolve.
 For scripted rebuilds:
 
 ```bash
+chmod +x scripts/install_packjack_rpi5.sh
 sudo ./scripts/install_packjack_rpi5.sh \
   --non-interactive \
   --ssid JackPack \

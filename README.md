@@ -59,6 +59,7 @@ sudo apt install -y git
 sudo -i
 git clone https://github.com/i12bp8/JackPack.git /root/JackPack
 cd /root/JackPack
+chmod +x scripts/install_packjack_rpi5.sh
 ./scripts/install_packjack_rpi5.sh
 reboot
 ```
@@ -72,6 +73,7 @@ After reboot:
 For a fully scripted install:
 
 ```bash
+chmod +x scripts/install_packjack_rpi5.sh
 sudo ./scripts/install_packjack_rpi5.sh \
   --non-interactive \
   --ssid JackPack \
