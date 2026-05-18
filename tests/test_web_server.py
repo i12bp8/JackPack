@@ -33,13 +33,15 @@ class PayloadFormSchemaTests(unittest.TestCase):
     def test_compact_control_text_becomes_named_actions(self):
         actions = web_server._actions_from_controls_text(
             "Controls: OK=start, KEY1=toggle mode, KEY3=exit\n"
-            "OK    -- Start scan       KEY1 -- Toggle view"
+            "OK    -- Start scan       KEY1 -- Toggle view\n"
+            "SELECT: UP/DN=Nav K1=Rescan K2=Attack"
         )
         labels = {action["button"]: action["label"] for action in actions}
 
         self.assertEqual(labels["OK"], "start")
         self.assertEqual(labels["KEY1"], "toggle mode")
         self.assertEqual(labels["KEY3"], "exit")
+        self.assertEqual(labels["DOWN"], "Nav")
 
     def test_wifi_security_key_mgmt_prefers_wpa2_for_transition_networks(self):
         self.assertEqual(web_server._security_key_mgmt("WPA2", "secret"), "wpa-psk")

@@ -1314,9 +1314,26 @@ main {
 
 .jp-payload-workbench {
   display: grid;
-  grid-template-columns: minmax(230px, 300px) minmax(0, 1fr) minmax(320px, 380px);
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 430px);
   gap: 1rem;
   align-items: start;
+}
+
+.jp-category-panel {
+  grid-column: 1 / -1;
+}
+
+.jp-category-panel .jp-category-list {
+  display: flex;
+  gap: 0.6rem;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.2rem;
+}
+
+.jp-category-panel .jp-category-card {
+  min-width: 13rem;
 }
 
 .jp-active-run-panel {
@@ -1329,6 +1346,22 @@ main {
   border-radius: 12px;
   background: #01030a;
   padding: 0.8rem;
+}
+
+.jp-selected-payload-card,
+.jp-detail-section {
+  border: 1px solid var(--jp-line);
+  border-radius: 12px;
+  background: #01030a;
+  padding: 0.8rem;
+}
+
+.jp-selected-payload-card {
+  margin-bottom: 0.75rem;
+}
+
+.jp-inline-form {
+  grid-template-columns: 1fr;
 }
 
 .jp-log-compact {
@@ -1411,14 +1444,18 @@ main {
   background: #070b16 !important;
 }
 
+.jp-payload-card {
+  cursor: pointer;
+}
+
+.jp-payload-selected {
+  border-color: rgba(179, 107, 255, 0.72) !important;
+  background: rgba(179, 107, 255, 0.08) !important;
+}
+
 @media (max-width: 1280px) {
-  .jp-payload-workbench,
   .jp-terminal-grid {
     grid-template-columns: 1fr;
-  }
-
-  .jp-active-run-panel {
-    position: static;
   }
 }
 
@@ -1443,9 +1480,18 @@ main {
     flex-direction: column;
   }
 
+  .jp-category-panel {
+    order: 0;
+  }
+
   .jp-active-run-panel {
-    order: -1;
+    order: 1;
     width: 100%;
+    position: static;
+  }
+
+  .jp-payload-browser {
+    order: 2;
   }
 
   .jp-payload-list {

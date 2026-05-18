@@ -368,7 +368,7 @@
         </section>
 
         <section class="jp-payload-workbench">
-          <div class="jp-panel">
+          <div class="jp-panel jp-category-panel">
             <div class="jp-panel-head">
               <div>
                 <div class="jp-panel-title">Categories</div>
@@ -381,7 +381,7 @@
             </label>
             <div id="payloadCategoryList" class="jp-category-list mt-3"></div>
           </div>
-          <div class="jp-panel">
+          <div id="payloadBrowserPanel" class="jp-panel jp-payload-browser">
             <div class="jp-panel-head">
               <div class="min-w-0">
                 <div id="payloadCategoryTitle" class="jp-panel-title">Payloads</div>
@@ -391,13 +391,34 @@
             <div id="payloadQuickGrid" class="jp-payload-list"></div>
           </div>
 
-          <div class="jp-panel jp-active-run-panel">
+          <div id="payloadDetailPanel" class="jp-panel jp-active-run-panel jp-payload-detail-panel">
             <div class="jp-panel-head">
               <div class="min-w-0">
-                <div class="jp-panel-title">Active Run</div>
-                <div id="payloadControlStatus" class="jp-panel-subtitle">Start a payload to use live actions.</div>
+                <div class="jp-panel-title">Payload Console</div>
+                <div id="payloadControlStatus" class="jp-panel-subtitle">Choose a payload to configure and run.</div>
               </div>
               <button id="payloadWorkbenchStop" type="button" class="jp-btn jp-btn-danger hidden"><i class="fa-solid fa-stop"></i> Stop</button>
+            </div>
+            <div class="jp-selected-payload-card">
+              <div class="text-[11px] uppercase tracking-[0.16em] text-slate-500">Selected Payload</div>
+              <div id="payloadDetailTitle" class="mt-1 text-xl font-black text-white">None selected</div>
+              <div id="payloadDetailPath" class="mt-1 text-xs text-slate-400">Pick from the list on the left.</div>
+              <div id="payloadDetailDescription" class="mt-2 text-sm text-slate-300">Payload setup will appear here with web-native fields whenever JackPack can infer them.</div>
+              <div id="payloadDetailTags" class="jp-tag-row"></div>
+            </div>
+            <div class="mt-3 jp-detail-section">
+              <div class="flex items-center justify-between gap-2">
+                <div>
+                  <div class="jp-mini-title">Setup</div>
+                  <div id="payloadInlineStatus" class="jp-panel-subtitle">Select a payload first.</div>
+                </div>
+                <button id="payloadInlineLaunch" type="button" class="jp-btn jp-btn-primary" disabled><i class="fa-solid fa-play"></i> Launch</button>
+              </div>
+              <div id="payloadInlineForm" class="jp-form-grid jp-inline-form mt-3"></div>
+              <label class="jp-field mt-3">
+                <span>Raw Args</span>
+                <input id="payloadInlineRaw" type="text" autocomplete="off" placeholder="Optional CLI flags">
+              </label>
             </div>
             <div class="jp-run-card">
               <div class="text-[11px] uppercase tracking-[0.16em] text-slate-500">Payload</div>
@@ -701,32 +722,6 @@
           <button id="payloadTextCancel" type="button" class="jp-btn jp-btn-muted">Cancel</button>
           <button id="payloadTextBackspace" type="button" class="jp-btn"><i class="fa-solid fa-delete-left"></i> Backspace</button>
           <button id="payloadTextSubmit" type="button" class="jp-btn jp-btn-primary"><i class="fa-solid fa-check"></i> Send</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Payload launch modal -->
-  <div id="payloadLaunchModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm">
-    <div class="max-w-2xl mx-auto mt-6 md:mt-12 px-4 pb-6">
-      <div class="rounded-2xl border border-slate-700/60 bg-slate-950/95 shadow-[0_0_40px_rgba(15,23,42,0.7)] overflow-hidden">
-        <div class="px-4 py-3 border-b border-slate-800/70 flex items-center justify-between gap-3">
-          <div class="min-w-0">
-            <div id="payloadLaunchTitle" class="text-sm font-semibold text-emerald-300 truncate">Launch Payload</div>
-            <div id="payloadLaunchMeta" class="text-[11px] text-slate-500 mt-1 truncate"></div>
-          </div>
-          <button id="payloadLaunchClose" type="button" class="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded-md bg-slate-900/60 border border-slate-700/60">x</button>
-        </div>
-        <div class="px-4 py-4 space-y-3 max-h-[72vh] overflow-auto">
-          <div id="payloadLaunchForm" class="jp-form-grid"></div>
-          <label class="jp-field">
-            <span>Raw Args</span>
-            <input id="payloadLaunchRaw" type="text" autocomplete="off" placeholder='Optional flags, for example --iface wlan1 --target 10.0.0.5'>
-          </label>
-        </div>
-        <div class="px-4 py-3 border-t border-slate-800/70 flex justify-end gap-2">
-          <button id="payloadLaunchCancel" type="button" class="jp-btn jp-btn-muted">Cancel</button>
-          <button id="payloadLaunchConfirm" type="button" class="jp-btn jp-btn-primary"><i class="fa-solid fa-play"></i> Launch</button>
         </div>
       </div>
     </div>

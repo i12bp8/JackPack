@@ -81,6 +81,16 @@
   const payloadCategoryList = document.getElementById("payloadCategoryList");
   const payloadCategoryTitle = document.getElementById("payloadCategoryTitle");
   const payloadCategoryDescription = document.getElementById("payloadCategoryDescription");
+  const payloadBrowserPanel = document.getElementById("payloadBrowserPanel");
+  const payloadDetailPanel = document.getElementById("payloadDetailPanel");
+  const payloadDetailTitle = document.getElementById("payloadDetailTitle");
+  const payloadDetailPath = document.getElementById("payloadDetailPath");
+  const payloadDetailDescription = document.getElementById("payloadDetailDescription");
+  const payloadDetailTags = document.getElementById("payloadDetailTags");
+  const payloadInlineStatus = document.getElementById("payloadInlineStatus");
+  const payloadInlineForm = document.getElementById("payloadInlineForm");
+  const payloadInlineRaw = document.getElementById("payloadInlineRaw");
+  const payloadInlineLaunch = document.getElementById("payloadInlineLaunch");
   const payloadLibraryActive = document.getElementById("payloadLibraryActive");
   const payloadLibraryStop = document.getElementById("payloadLibraryStop");
   const payloadLibraryRefresh = document.getElementById("payloadLibraryRefresh");
@@ -120,14 +130,6 @@
   const networkForceControl = document.getElementById("networkForceControl");
   const networkConnect = document.getElementById("networkConnect");
   const networkInterfaces = document.getElementById("networkInterfaces");
-  const payloadLaunchModal = document.getElementById("payloadLaunchModal");
-  const payloadLaunchTitle = document.getElementById("payloadLaunchTitle");
-  const payloadLaunchMeta = document.getElementById("payloadLaunchMeta");
-  const payloadLaunchForm = document.getElementById("payloadLaunchForm");
-  const payloadLaunchRaw = document.getElementById("payloadLaunchRaw");
-  const payloadLaunchCancel = document.getElementById("payloadLaunchCancel");
-  const payloadLaunchClose = document.getElementById("payloadLaunchClose");
-  const payloadLaunchConfirm = document.getElementById("payloadLaunchConfirm");
   const payloadTextModal = document.getElementById("payloadTextModal");
   const payloadTextTitle = document.getElementById("payloadTextTitle");
   const payloadTextMeta = document.getElementById("payloadTextMeta");
@@ -631,11 +633,12 @@
     open: {},
     activePath: null,
     activeSchema: null,
+    selectedPath: "",
+    selectedSchema: null,
     selectedCategory: "",
     query: "",
   };
   let networkState = { interfaces: [], selectedNetwork: null };
-  let payloadLaunchState = { path: "", schema: null };
   let textSessionState = { active: false, sessionId: "", defaultValue: "" };
   let term = null;
   let fitAddon = null;
@@ -763,28 +766,21 @@
     return icons[button] || "fa-circle-dot";
   }
 
-  function defaultPayloadActions() {
-    return [
-      { button: "OK", label: "Select", description: "Confirm the highlighted action.", group: "navigation" },
-      { button: "KEY1", label: "Primary", description: "Main payload action.", group: "actions" },
-      { button: "KEY2", label: "Secondary", description: "Alternate payload action.", group: "actions" },
-      { button: "KEY3", label: "Back", description: "Back, cancel, stop, or exit.", group: "actions" },
-      { button: "UP", label: "Up", description: "Move up.", group: "navigation" },
-      { button: "DOWN", label: "Down", description: "Move down.", group: "navigation" },
-      { button: "LEFT", label: "Left", description: "Move left or previous option.", group: "navigation" },
-      { button: "RIGHT", label: "Right", description: "Move right or next option.", group: "navigation" },
-    ];
-  }
-
   function renderPayloadActions() {
     if (!payloadActionGrid) return;
     const running = !!payloadState.activePath;
     const schema = payloadState.activeSchema || {};
-    const actions = Array.isArray(schema.actions) && schema.actions.length ? schema.actions : defaultPayloadActions();
+    const actions = Array.isArray(schema.actions) ? schema.actions : [];
     if (payloadControlStatus) {
       payloadControlStatus.textContent = running
         ? `Runtime controls for ${payloadLabel(payloadState.activePath)}`
-        : "Start a payload to use live actions.";
+        : payloadState.selectedPath
+          ? `Ready to launch ${payloadLabel(payloadState.selectedPath)}.`
+          : "Choose a payload to configure and run.";
+    }
+    if (!actions.length) {
+      payloadActionGrid.innerHTML = `<div class="jp-empty-form">No web-native runtime actions declared for this payload yet. Use Setup to launch it, watch Live Output, and stop it from the console.</div>`;
+      return;
     }
     payloadActionGrid.innerHTML = actions
       .map((action) => {
@@ -2530,10 +2526,19 @@
       if (!payloadState.selectedCategory && payloadState.categories.length) {
         payloadState.selectedCategory = payloadState.categories[0].id || "";
       }
-      renderPayloadSidebar();
-      renderPayloadCategories();
-      renderPayloadQuickGrid();
-      setPayloadStatus("Ready");
+    renderPayloadSidebar();
+    renderPayloadCategories();
+    renderPayloadQuickGrid();
+    if (!payloadState.selectedPath) {
+      const firstCat = payloadState.categories.find((cat) => cat.id === payloadState.selectedCategory) || payloadState.categories[0];
+      const firstPayload = firstCat && Array.isArray(firstCat.items) ? firstCat.items[0] : null;
+      if (firstPayload && firstPayload.path) {
+        selectPayload(firstPayload.path).catch(() => {});
+      } else {
+        renderPayloadDetail(null);
+      }
+    }
+    setPayloadStatus("Ready");
     } catch (e) {
       setPayloadStatus("Failed to load");
       if (payloadSidebar)
@@ -2589,6 +2594,12 @@
     renderPayloadSidebar();
     renderPayloadCategories();
     renderPayloadQuickGrid();
+    const selectedCat = cats.find((cat) => cat.id === payloadState.selectedCategory) || cats[0] || null;
+    const firstPayload = selectedCat && Array.isArray(selectedCat.items) ? selectedCat.items[0] : null;
+    if (firstPayload && firstPayload.path) {
+      selectPayload(firstPayload.path).catch(() => {});
+    }
+    scrollIntoWorkbench(payloadBrowserPanel);
   }
 
   function renderPayloadCategories() {
@@ -2673,13 +2684,13 @@
         const meta = item.meta || {};
         const tags = Array.isArray(meta.tags) && meta.tags.length ? meta.tags : [String(item.category || "payload")];
         const description = meta.description || "No description yet. Open Payload Studio to add metadata or a module docstring.";
-        const disabled = !!payloadState.activePath;
         const isActive = payloadState.activePath === itemPath;
+        const isSelected = payloadState.selectedPath === itemPath;
         const action = isActive
           ? '<button type="button" data-stop="1" class="jp-btn jp-btn-danger"><i class="fa-solid fa-stop"></i> Stop</button>'
-          : `<button type="button" data-start="${encoded}" ${disabled ? "disabled" : ""} class="jp-btn ${disabled ? "opacity-50 cursor-not-allowed" : "jp-btn-primary"}"><i class="fa-solid fa-play"></i> Configure</button>`;
+          : `<button type="button" data-select-payload="${encoded}" class="jp-btn ${isSelected ? "jp-btn-primary" : "jp-btn-muted"}"><i class="fa-solid ${isSelected ? "fa-circle-dot" : "fa-arrow-right"}"></i> ${isSelected ? "Selected" : "Open"}</button>`;
         return `
-          <div class="jp-payload-card">
+          <div class="jp-payload-card ${isSelected ? "jp-payload-selected" : ""}" data-select-payload="${encoded}">
             <div class="jp-payload-row">
               <div class="min-w-0">
                 <div class="jp-payload-name">${escapeHtml(payloadLabel(itemPath))}</div>
@@ -2724,103 +2735,158 @@
     return args;
   }
 
-  function closePayloadLaunch() {
-    if (payloadLaunchModal) payloadLaunchModal.classList.add("hidden");
-    payloadLaunchState = { path: "", schema: null };
+  function payloadFieldHtml(field, idx) {
+    const name = escapeHtml(field.name || `field_${idx}`);
+    const label = escapeHtml(field.label || field.name || "Option");
+    const help = field.help ? `<div class="jp-field-help">${escapeHtml(field.help)}</div>` : "";
+    const required = field.required ? "required" : "";
+    const envAttr = field.env ? `data-env="${escapeHtml(field.env)}"` : "";
+    const def = field.default === undefined || field.default === null ? "" : String(field.default);
+    if (field.type === "checkbox") {
+      const checked = field.default === true ? "checked" : "";
+      return `<label class="jp-check-row">
+        <input type="checkbox" data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} ${checked}>
+        <span><strong>${label}</strong>${help}</span>
+      </label>`;
+    }
+    if (field.type === "interface") {
+      const ifaceType = String(field.iface_type || "").toLowerCase();
+      const needsMonitor = !!field.require_monitor;
+      const interfaces = (networkState.interfaces || []).filter((item) => {
+        if (!(item.present || item.recommended || item.protected)) return false;
+        if (ifaceType === "wifi") return !!item.wireless;
+        if (ifaceType === "eth" || ifaceType === "wired") return !item.wireless;
+        if (needsMonitor) return !!item.wireless;
+        return true;
+      });
+      const options = interfaces.length
+        ? interfaces.map((item) => {
+            const value = String(item.name || "");
+            const selected = value === def ? "selected" : "";
+            return `<option value="${escapeHtml(value)}" ${selected}>${escapeHtml(ifaceLabel(item))}</option>`;
+          }).join("")
+        : `<option value="${escapeHtml(def || "wlan1")}">${escapeHtml(def || "wlan1")}</option>`;
+      return `<label class="jp-field">
+        <span>${label}</span>
+        <select data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} ${required}>
+          ${options}
+        </select>
+        ${help}
+      </label>`;
+    }
+    if (field.type === "select" && Array.isArray(field.choices)) {
+      return `<label class="jp-field">
+        <span>${label}</span>
+        <select data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} ${required}>
+          <option value="">Default</option>
+          ${field.choices.map((choice) => `<option value="${escapeHtml(choice)}" ${choice === def ? "selected" : ""}>${escapeHtml(choice)}</option>`).join("")}
+        </select>
+        ${help}
+      </label>`;
+    }
+    return `<label class="jp-field">
+      <span>${label}</span>
+      <input type="${field.type === "number" ? "number" : "text"}" data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} value="${escapeHtml(def)}" ${required}>
+      ${help}
+    </label>`;
   }
 
-  function renderPayloadLaunchForm(schema) {
-    if (!payloadLaunchForm) return;
+  function renderPayloadFormInto(container, schema, rawInput, emptyText) {
+    if (!container) return;
     const fields = Array.isArray(schema?.fields) ? schema.fields : [];
-    if (payloadLaunchTitle) payloadLaunchTitle.textContent = schema?.name || payloadLabel(schema?.path);
-    if (payloadLaunchMeta) {
-      const tags = Array.isArray(schema?.meta?.tags) ? schema.meta.tags.join(" · ") : "headless payload";
-      payloadLaunchMeta.textContent = `${schema?.path || ""}${tags ? ` · ${tags}` : ""}`;
-    }
     if (!fields.length) {
-      payloadLaunchForm.innerHTML =
-        '<div class="jp-empty-form">No structured options declared yet. Use raw args below when a payload needs flags.</div>';
+      container.innerHTML = `<div class="jp-empty-form">${escapeHtml(emptyText || "No structured options declared. Raw args are available below.")}</div>`;
     } else {
-      payloadLaunchForm.innerHTML = fields
-        .map((field, idx) => {
-          const name = escapeHtml(field.name || `field_${idx}`);
-          const label = escapeHtml(field.label || field.name || "Option");
-          const help = field.help ? `<div class="jp-field-help">${escapeHtml(field.help)}</div>` : "";
-          const required = field.required ? "required" : "";
-          const envAttr = field.env ? `data-env="${escapeHtml(field.env)}"` : "";
-          const def = field.default === undefined || field.default === null ? "" : String(field.default);
-          if (field.type === "checkbox") {
-            const checked = field.default === true ? "checked" : "";
-            return `<label class="jp-check-row">
-              <input type="checkbox" data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} ${checked}>
-              <span><strong>${label}</strong>${help}</span>
-            </label>`;
-          }
-          if (field.type === "interface") {
-            const ifaceType = String(field.iface_type || "").toLowerCase();
-            const needsMonitor = !!field.require_monitor;
-            const interfaces = (networkState.interfaces || []).filter((item) => {
-              if (!(item.present || item.recommended || item.protected)) return false;
-              if (ifaceType === "wifi") return !!item.wireless;
-              if (ifaceType === "eth" || ifaceType === "wired") return !item.wireless;
-              if (needsMonitor) return !!item.wireless;
-              return true;
-            });
-            const options = interfaces.length
-              ? interfaces.map((item) => {
-                  const value = String(item.name || "");
-                  const selected = value === def ? "selected" : "";
-                  return `<option value="${escapeHtml(value)}" ${selected}>${escapeHtml(ifaceLabel(item))}</option>`;
-                }).join("")
-              : `<option value="${escapeHtml(def || "wlan1")}">${escapeHtml(def || "wlan1")}</option>`;
-            return `<label class="jp-field">
-              <span>${label}</span>
-              <select data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} ${required}>
-                ${options}
-              </select>
-              ${help}
-            </label>`;
-          }
-          if (field.type === "select" && Array.isArray(field.choices)) {
-            return `<label class="jp-field">
-              <span>${label}</span>
-              <select data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} ${required}>
-                <option value="">Default</option>
-                ${field.choices.map((choice) => `<option value="${escapeHtml(choice)}" ${choice === def ? "selected" : ""}>${escapeHtml(choice)}</option>`).join("")}
-              </select>
-              ${help}
-            </label>`;
-          }
-          return `<label class="jp-field">
-            <span>${label}</span>
-            <input type="${field.type === "number" ? "number" : "text"}" data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} value="${escapeHtml(def)}" ${required}>
-            ${help}
-          </label>`;
-        })
-        .join("");
+      container.innerHTML = fields.map((field, idx) => payloadFieldHtml(field, idx)).join("");
     }
-    if (payloadLaunchRaw) payloadLaunchRaw.value = "";
+    if (rawInput) rawInput.value = "";
   }
 
-  async function openPayloadLaunch(path) {
-    payloadLaunchState = { path, schema: null };
-    if (payloadLaunchModal) payloadLaunchModal.classList.remove("hidden");
-    if (payloadLaunchForm) {
-      payloadLaunchForm.innerHTML = '<div class="jp-empty-form">Loading options...</div>';
+  function renderPayloadDetail(schema) {
+    const path = String(schema?.path || payloadState.selectedPath || "");
+    const meta = schema?.meta || {};
+    const selected = !!path;
+    const tags = Array.isArray(meta.tags) && meta.tags.length ? meta.tags : [];
+    if (payloadDetailTitle) {
+      payloadDetailTitle.textContent = selected ? (schema?.name || payloadLabel(path)) : "None selected";
     }
-    try {
-      if (!networkState.interfaces.length) {
-        await loadNetworkStatus();
+    if (payloadDetailPath) {
+      payloadDetailPath.textContent = selected ? path : "Pick from the list on the left.";
+    }
+    if (payloadDetailDescription) {
+      payloadDetailDescription.textContent = selected
+        ? (meta.description || "This payload does not describe itself yet. Setup and inferred controls are shown below.")
+        : "Payload setup will appear here with web-native fields whenever JackPack can infer them.";
+    }
+    if (payloadDetailTags) {
+      payloadDetailTags.innerHTML = selected
+        ? tags.slice(0, 6).map((tag, idx) => `<span class="jp-tag ${idx === 0 ? "jp-tag-purple" : ""}">${escapeHtml(String(tag))}</span>`).join("")
+        : "";
+    }
+    renderPayloadFormInto(
+      payloadInlineForm,
+      schema,
+      payloadInlineRaw,
+      selected
+        ? "No setup fields were detected for this payload yet. Launch with defaults, or add raw args if the payload supports CLI flags."
+        : "Select a payload to see setup fields.",
+    );
+    if (payloadInlineStatus) {
+      const fieldCount = Array.isArray(schema?.fields) ? schema.fields.length : 0;
+      payloadInlineStatus.textContent = selected
+        ? fieldCount
+          ? `${fieldCount} setup field${fieldCount === 1 ? "" : "s"} ready.`
+          : "Launches with defaults."
+        : "Select a payload first.";
+    }
+    if (payloadInlineLaunch) {
+      payloadInlineLaunch.disabled = !selected || !!payloadState.activePath;
+      payloadInlineLaunch.innerHTML = payloadState.activePath === path
+        ? '<i class="fa-solid fa-circle-play"></i> Running'
+        : '<i class="fa-solid fa-play"></i> Launch';
+    }
+    renderPayloadActions();
+  }
+
+  function scrollIntoWorkbench(el) {
+    if (!el) return;
+    setTimeout(() => {
+      try {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch {
+        el.scrollIntoView();
       }
-      const res = await apiFetch(getApiUrl("/api/payloads/schema", { path }), { cache: "no-store" });
+    }, 40);
+  }
+
+  async function selectPayload(path, opts = {}) {
+    const cleanPath = String(path || "");
+    if (!cleanPath) return;
+    payloadState.selectedPath = cleanPath;
+    if (payloadInlineStatus) payloadInlineStatus.textContent = "Loading setup...";
+    if (payloadInlineLaunch) payloadInlineLaunch.disabled = true;
+    if (payloadDetailTitle) payloadDetailTitle.textContent = payloadLabel(cleanPath);
+    if (payloadDetailPath) payloadDetailPath.textContent = cleanPath;
+    if (payloadInlineForm) payloadInlineForm.innerHTML = '<div class="jp-empty-form">Loading setup...</div>';
+    renderPayloadQuickGrid();
+    if (opts.scroll) scrollIntoWorkbench(payloadDetailPanel);
+    try {
+      const res = await apiFetch(getApiUrl("/api/payloads/schema", { path: cleanPath }), { cache: "no-store" });
       const schema = await res.json();
       if (!res.ok) throw new Error(schema && schema.error ? schema.error : "schema_failed");
-      payloadLaunchState.schema = schema;
-      renderPayloadLaunchForm(schema);
+      const needsInterfaces = Array.isArray(schema.fields) && schema.fields.some((field) => field && field.type === "interface");
+      if (needsInterfaces && !networkState.interfaces.length) {
+        await loadNetworkStatus();
+      }
+      payloadState.selectedSchema = schema;
+      if (payloadState.activePath === cleanPath) {
+        payloadState.activeSchema = schema;
+      }
+      renderPayloadDetail(schema);
     } catch (e) {
-      payloadLaunchState.schema = { path, name: payloadLabel(path), fields: [], raw_args: true, meta: {} };
-      renderPayloadLaunchForm(payloadLaunchState.schema);
-      if (payloadLaunchMeta) payloadLaunchMeta.textContent = e && e.message ? e.message : "Options unavailable";
+      payloadState.selectedSchema = { path: cleanPath, name: payloadLabel(cleanPath), fields: [], raw_args: true, actions: [], meta: {} };
+      renderPayloadDetail(payloadState.selectedSchema);
+      if (payloadInlineStatus) payloadInlineStatus.textContent = e && e.message ? e.message : "Setup unavailable";
     }
   }
 
@@ -2839,17 +2905,22 @@
       const schema = await res.json();
       if (!res.ok) throw new Error(schema && schema.error ? schema.error : "schema_failed");
       payloadState.activeSchema = schema;
+      if (!payloadState.selectedPath || payloadState.selectedPath === path) {
+        payloadState.selectedPath = path;
+        payloadState.selectedSchema = schema;
+        renderPayloadDetail(schema);
+      }
     } catch {
-      payloadState.activeSchema = { path, actions: defaultPayloadActions() };
+      payloadState.activeSchema = { path, actions: [] };
     }
     renderPayloadActions();
   }
 
-  function buildPayloadArgsFromForm() {
+  function buildPayloadArgsFromForm(formEl = null, rawEl = null) {
     const args = [];
     const env = {};
-    if (payloadLaunchForm) {
-      payloadLaunchForm.querySelectorAll("[data-payload-field]").forEach((el) => {
+    if (formEl) {
+      formEl.querySelectorAll("[data-payload-field]").forEach((el) => {
         const arg = el.getAttribute("data-arg") || "";
         const envKey = el.getAttribute("data-env") || "";
         if (el.type === "checkbox") {
@@ -2863,20 +2934,19 @@
         else if (arg) args.push(arg, value);
       });
     }
-    if (payloadLaunchRaw && payloadLaunchRaw.value.trim()) {
-      args.push(...splitArgs(payloadLaunchRaw.value));
+    if (rawEl && rawEl.value.trim()) {
+      args.push(...splitArgs(rawEl.value));
     }
     return { args, env };
   }
 
-  async function confirmPayloadLaunch() {
-    const path = payloadLaunchState.path;
+  async function confirmInlinePayloadLaunch() {
+    const path = payloadState.selectedPath;
     if (!path) return;
-    const built = buildPayloadArgsFromForm();
-    const schema = payloadLaunchState.schema;
-    closePayloadLaunch();
-    payloadState.activeSchema = schema || null;
+    const built = buildPayloadArgsFromForm(payloadInlineForm, payloadInlineRaw);
+    payloadState.activeSchema = payloadState.selectedSchema || null;
     await startPayload(path, built.args, built.env);
+    scrollIntoWorkbench(payloadDetailPanel);
   }
 
   async function startPayload(path, args = [], env = {}) {
@@ -2884,6 +2954,7 @@
     if (payloadLogTail) payloadLogTail.textContent = "Starting payload...";
     if (payloadWorkbenchLogTail) payloadWorkbenchLogTail.textContent = "Starting payload...";
     payloadState.activePath = path;
+    payloadState.selectedPath = path;
     setActivePayloadView({ running: true, path, started_at: Date.now() / 1000 });
     try {
       const url = getApiUrl("/api/payloads/start");
@@ -2897,6 +2968,7 @@
         throw new Error(data && data.error ? data.error : "start_failed");
       }
       payloadState.activePath = path;
+      payloadState.selectedPath = path;
       setActivePayloadView(data);
       if (!payloadState.activeSchema || payloadState.activeSchema.path !== path) {
         await loadActivePayloadSchema(path);
@@ -2905,12 +2977,14 @@
       }
       renderPayloadSidebar();
       renderPayloadQuickGrid();
+      renderPayloadDetail(payloadState.selectedSchema || payloadState.activeSchema || { path, meta: {}, fields: [], actions: [] });
       setPayloadStatus("Launched");
       loadPayloadLog();
     } catch (e) {
       payloadState.activePath = null;
       setActivePayloadView({ running: false, path: null });
       renderPayloadQuickGrid();
+      renderPayloadDetail(payloadState.selectedSchema);
       setPayloadStatus(e && e.message ? e.message : "Start failed");
     }
   }
@@ -2930,6 +3004,7 @@
       renderPayloadSidebar();
       renderPayloadQuickGrid();
       renderPayloadActions();
+      renderPayloadDetail(payloadState.selectedSchema);
       setPayloadStatus("Ready");
       loadPayloadLog();
     } catch (e) {
@@ -2950,6 +3025,10 @@
       const path = running ? data.path || null : null;
       if (payloadState.activePath !== path) {
         payloadState.activePath = path;
+        if (path) {
+          payloadState.selectedPath = path;
+          payloadState.selectedSchema = null;
+        }
         payloadState.activeSchema = null;
         renderPayloadSidebar();
         renderPayloadQuickGrid();
@@ -3302,7 +3381,7 @@
       if (startBtn) {
         const encodedPath = startBtn.getAttribute("data-start") || "";
         const path = decodeURIComponent(encodedPath);
-        if (path) openPayloadLaunch(path);
+        if (path) selectPayload(path, { scroll: true });
         return;
       }
       const stopBtn = e.target.closest("[data-stop]");
@@ -3337,16 +3416,21 @@
     });
   if (payloadQuickGrid)
     payloadQuickGrid.addEventListener("click", (e) => {
-      const startBtn = e.target.closest("[data-start]");
-      if (startBtn) {
-        const encodedPath = startBtn.getAttribute("data-start") || "";
-        const path = decodeURIComponent(encodedPath);
-        if (path) openPayloadLaunch(path);
+      const stopBtn = e.target.closest("[data-stop]");
+      if (stopBtn) {
+        stopPayload();
         return;
       }
-      const stopBtn = e.target.closest("[data-stop]");
-      if (stopBtn) stopPayload();
+      const selectBtn = e.target.closest("[data-select-payload]");
+      if (selectBtn) {
+        const encodedPath = selectBtn.getAttribute("data-select-payload") || "";
+        const path = decodeURIComponent(encodedPath);
+        if (path) selectPayload(path, { scroll: true });
+        return;
+      }
     });
+  if (payloadInlineLaunch)
+    payloadInlineLaunch.addEventListener("click", confirmInlinePayloadLaunch);
   if (payloadActionGrid)
     payloadActionGrid.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-payload-action]");
@@ -3381,16 +3465,6 @@
   if (networkOpen)
     networkOpen.addEventListener("change", () => {
       if (networkPassword) networkPassword.disabled = networkOpen.checked;
-    });
-  if (payloadLaunchCancel)
-    payloadLaunchCancel.addEventListener("click", closePayloadLaunch);
-  if (payloadLaunchClose)
-    payloadLaunchClose.addEventListener("click", closePayloadLaunch);
-  if (payloadLaunchConfirm)
-    payloadLaunchConfirm.addEventListener("click", confirmPayloadLaunch);
-  if (payloadLaunchModal)
-    payloadLaunchModal.addEventListener("click", (e) => {
-      if (e.target === payloadLaunchModal) closePayloadLaunch();
     });
   if (payloadTextSubmit)
     payloadTextSubmit.addEventListener("click", submitPayloadText);

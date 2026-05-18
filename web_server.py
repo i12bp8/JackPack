@@ -1133,21 +1133,8 @@ def _module_literal_env(tree: ast.AST) -> dict[str, object]:
                 env[node.target.id] = value
     return env
 
-
-_DEFAULT_PAYLOAD_ACTIONS = [
-    {"button": "OK", "label": "Select", "description": "Confirm the highlighted action.", "group": "navigation"},
-    {"button": "KEY1", "label": "Primary", "description": "Main payload action.", "group": "actions"},
-    {"button": "KEY2", "label": "Secondary", "description": "Alternate payload action.", "group": "actions"},
-    {"button": "KEY3", "label": "Back", "description": "Back, cancel, stop, or exit.", "group": "actions"},
-    {"button": "UP", "label": "Up", "description": "Move up.", "group": "navigation"},
-    {"button": "DOWN", "label": "Down", "description": "Move down.", "group": "navigation"},
-    {"button": "LEFT", "label": "Left", "description": "Move left or previous option.", "group": "navigation"},
-    {"button": "RIGHT", "label": "Right", "description": "Move right or next option.", "group": "navigation"},
-]
-
-
 _ACTION_BUTTONS = {"UP", "DOWN", "LEFT", "RIGHT", "OK", "KEY1", "KEY2", "KEY3"}
-_ACTION_ALIASES = {"DN": "DOWN"}
+_ACTION_ALIASES = {"DN": "DOWN", "K1": "KEY1", "K2": "KEY2", "K3": "KEY3"}
 
 
 def _normalize_action(item: object) -> dict | None:
@@ -1189,11 +1176,11 @@ def _actions_from_controls_text(source: str) -> list[dict]:
 
     for raw in source.splitlines():
         line = raw.strip().strip("#").strip()
-        match = re.match(r"^(UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123])(?:\s*/\s*(UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123]))?\s*(?:[-:=]+|--|—)\s*(.+)$", line, re.I)
+        match = re.match(r"^(UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123]|K[123])(?:\s*/\s*(UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123]|K[123]))?\s*(?:[-:=]+|--|—)\s*(.+)$", line, re.I)
         if match:
             description = match.group(3)
             has_more_actions = re.search(
-                r"\b(UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123])\b\s*(?::|=|--|—|\s{2,})",
+                r"\b(UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123]|K[123])\b\s*(?::|=|--|—|\s{2,})",
                 description,
                 re.I,
             )
@@ -1211,10 +1198,10 @@ def _actions_from_controls_text(source: str) -> list[dict]:
         if "controls:" in compact.lower():
             compact = compact.split(":", 1)[1]
         for match in re.finditer(
-            r"\b(UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123])\b"
-            r"(?:\s*/\s*(UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123]))?"
+            r"\b(UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123]|K[123])\b"
+            r"(?:\s*/\s*(UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123]|K[123]))?"
             r"\s*(?::|=|--|—|\s{2,})\s*"
-            r"([^\"'`,;|]{2,70}?)(?=\s+\b(?:UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123])\b\s*(?::|=|--|—|\s{2,})|[,;|]|$)",
+            r"([^\"'`,;|]{2,70}?)(?=\s+\b(?:UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123]|K[123])\b(?:\s*/\s*(?:UP|DOWN|DN|LEFT|RIGHT|OK|KEY[123]|K[123]))?\s*(?::|=|--|—|\s{2,})|[,;|]|$)",
             compact,
             re.I,
         ):
@@ -1237,10 +1224,8 @@ def _payload_actions(tree: ast.AST, literal_env: dict[str, object], source: str)
                         return normalized
     inferred = _actions_from_controls_text(source)
     if inferred:
-        existing = {item["button"] for item in inferred}
-        inferred.extend(item for item in _DEFAULT_PAYLOAD_ACTIONS if item["button"] not in existing)
         return inferred
-    return list(_DEFAULT_PAYLOAD_ACTIONS)
+    return []
 
 
 def _infer_headless_fields(tree: ast.AST, meta: dict) -> list[dict]:
