@@ -23,6 +23,13 @@ class PayloadFormSchemaTests(unittest.TestCase):
         self.assertEqual(first["type"], "interface")
         self.assertEqual(first["iface_type"], "wifi")
 
+    def test_payload_schema_has_runtime_actions(self):
+        schema = web_server._payload_form_schema(Path("payloads/wifi/deauth.py"))
+        buttons = {action["button"] for action in schema["actions"]}
+
+        self.assertIn("OK", buttons)
+        self.assertIn("KEY3", buttons)
+
     def test_wifi_security_key_mgmt_prefers_wpa2_for_transition_networks(self):
         self.assertEqual(web_server._security_key_mgmt("WPA2", "secret"), "wpa-psk")
         self.assertEqual(web_server._security_key_mgmt("WPA2 WPA3", "secret"), "wpa-psk")

@@ -82,6 +82,8 @@
   const payloadLibraryActive = document.getElementById("payloadLibraryActive");
   const payloadLibraryStop = document.getElementById("payloadLibraryStop");
   const payloadLibraryRefresh = document.getElementById("payloadLibraryRefresh");
+  const payloadActionGrid = document.getElementById("payloadActionGrid");
+  const payloadControlStatus = document.getElementById("payloadControlStatus");
   const payloadSummary = document.getElementById("payloadSummary");
   const payloadLogTail = document.getElementById("payloadLogTail");
   const payloadLogRefresh = document.getElementById("payloadLogRefresh");
@@ -119,6 +121,14 @@
   const payloadLaunchCancel = document.getElementById("payloadLaunchCancel");
   const payloadLaunchClose = document.getElementById("payloadLaunchClose");
   const payloadLaunchConfirm = document.getElementById("payloadLaunchConfirm");
+  const payloadTextModal = document.getElementById("payloadTextModal");
+  const payloadTextTitle = document.getElementById("payloadTextTitle");
+  const payloadTextMeta = document.getElementById("payloadTextMeta");
+  const payloadTextInput = document.getElementById("payloadTextInput");
+  const payloadTextSubmit = document.getElementById("payloadTextSubmit");
+  const payloadTextCancel = document.getElementById("payloadTextCancel");
+  const payloadTextCancelTop = document.getElementById("payloadTextCancelTop");
+  const payloadTextBackspace = document.getElementById("payloadTextBackspace");
   const settingsStatus = document.getElementById("settingsStatus");
   const configStatus = document.getElementById("configStatus");
   const configReload = document.getElementById("configReload");
@@ -613,11 +623,13 @@
     categories: [],
     open: {},
     activePath: null,
+    activeSchema: null,
     selectedCategory: "",
     query: "",
   };
   let networkState = { interfaces: [], selectedNetwork: null };
   let payloadLaunchState = { path: "", schema: null };
+  let textSessionState = { active: false, sessionId: "", defaultValue: "" };
   let term = null;
   let fitAddon = null;
   let shellOpen = false;
@@ -710,6 +722,60 @@
     if (payloadLibraryStop) {
       payloadLibraryStop.classList.toggle("hidden", !running);
     }
+    renderPayloadActions();
+  }
+
+  function actionIcon(button) {
+    const icons = {
+      UP: "fa-arrow-up",
+      DOWN: "fa-arrow-down",
+      LEFT: "fa-arrow-left",
+      RIGHT: "fa-arrow-right",
+      OK: "fa-check",
+      KEY1: "fa-bolt",
+      KEY2: "fa-sliders",
+      KEY3: "fa-arrow-left-long",
+    };
+    return icons[button] || "fa-circle-dot";
+  }
+
+  function defaultPayloadActions() {
+    return [
+      { button: "OK", label: "Select", description: "Confirm the highlighted action.", group: "navigation" },
+      { button: "KEY1", label: "Primary", description: "Main payload action.", group: "actions" },
+      { button: "KEY2", label: "Secondary", description: "Alternate payload action.", group: "actions" },
+      { button: "KEY3", label: "Back", description: "Back, cancel, stop, or exit.", group: "actions" },
+      { button: "UP", label: "Up", description: "Move up.", group: "navigation" },
+      { button: "DOWN", label: "Down", description: "Move down.", group: "navigation" },
+      { button: "LEFT", label: "Left", description: "Move left or previous option.", group: "navigation" },
+      { button: "RIGHT", label: "Right", description: "Move right or next option.", group: "navigation" },
+    ];
+  }
+
+  function renderPayloadActions() {
+    if (!payloadActionGrid) return;
+    const running = !!payloadState.activePath;
+    const schema = payloadState.activeSchema || {};
+    const actions = Array.isArray(schema.actions) && schema.actions.length ? schema.actions : defaultPayloadActions();
+    if (payloadControlStatus) {
+      payloadControlStatus.textContent = running
+        ? `Runtime controls for ${payloadLabel(payloadState.activePath)}`
+        : "Start a payload to use live actions.";
+    }
+    payloadActionGrid.innerHTML = actions
+      .map((action) => {
+        const button = String(action.button || "").toUpperCase();
+        const label = escapeHtml(action.label || button);
+        const desc = escapeHtml(action.description || "");
+        return `<button type="button" data-payload-action="${escapeHtml(button)}" ${running ? "" : "disabled"} class="jp-action-btn ${running ? "" : "opacity-45 cursor-not-allowed"}">
+          <i class="fa-solid ${actionIcon(button)}"></i>
+          <span>
+            <strong>${label}</strong>
+            ${desc ? `<small>${desc}</small>` : ""}
+          </span>
+        </button>`;
+      })
+      .join("");
   }
 
   function setSystemStatus(txt) {
@@ -975,6 +1041,10 @@
           shellOpen = false;
           terminalEl?.closest(".terminal-wrap")?.classList.remove("shell-open");
           setShellStatus("Exited");
+        }
+        if (msg.type === "text_session") {
+          handleTextSession(msg);
+          return;
         }
       } catch {}
     };
@@ -2695,6 +2765,27 @@
     }
   }
 
+  async function loadActivePayloadSchema(path) {
+    if (!path) {
+      payloadState.activeSchema = null;
+      renderPayloadActions();
+      return;
+    }
+    if (payloadState.activeSchema && payloadState.activeSchema.path === path) {
+      renderPayloadActions();
+      return;
+    }
+    try {
+      const res = await apiFetch(getApiUrl("/api/payloads/schema", { path }), { cache: "no-store" });
+      const schema = await res.json();
+      if (!res.ok) throw new Error(schema && schema.error ? schema.error : "schema_failed");
+      payloadState.activeSchema = schema;
+    } catch {
+      payloadState.activeSchema = { path, actions: defaultPayloadActions() };
+    }
+    renderPayloadActions();
+  }
+
   function buildPayloadArgsFromForm() {
     const args = [];
     const env = {};
@@ -2723,7 +2814,9 @@
     const path = payloadLaunchState.path;
     if (!path) return;
     const built = buildPayloadArgsFromForm();
+    const schema = payloadLaunchState.schema;
     closePayloadLaunch();
+    payloadState.activeSchema = schema || null;
     await startPayload(path, built.args, built.env);
   }
 
@@ -2741,6 +2834,11 @@
         throw new Error(data && data.error ? data.error : "start_failed");
       }
       payloadState.activePath = path;
+      if (!payloadState.activeSchema || payloadState.activeSchema.path !== path) {
+        await loadActivePayloadSchema(path);
+      } else {
+        renderPayloadActions();
+      }
       renderPayloadSidebar();
       renderPayloadQuickGrid();
       setPayloadStatus("Launched");
@@ -2760,8 +2858,10 @@
         throw new Error(data && data.error ? data.error : "stop_failed");
       }
       payloadState.activePath = null;
+      payloadState.activeSchema = null;
       renderPayloadSidebar();
       renderPayloadQuickGrid();
+      renderPayloadActions();
       setPayloadStatus("Ready");
       loadPayloadLog();
     } catch (e) {
@@ -2782,8 +2882,15 @@
       const path = running ? data.path || null : null;
       if (payloadState.activePath !== path) {
         payloadState.activePath = path;
+        payloadState.activeSchema = null;
         renderPayloadSidebar();
         renderPayloadQuickGrid();
+      }
+      if (running) {
+        loadActivePayloadSchema(path);
+      } else if (payloadState.activeSchema) {
+        payloadState.activeSchema = null;
+        renderPayloadActions();
       }
       setPayloadStatus(running ? "Running" : "Ready");
       setActivePayloadView(data);
@@ -2807,6 +2914,73 @@
     } catch (e) {
       payloadLogTail.textContent = "Unable to read payload log.";
       setPayloadLogStatus("Unavailable");
+    }
+  }
+
+  function handleTextSession(msg) {
+    const active = !!(msg && msg.active);
+    if (!active) {
+      textSessionState = { active: false, sessionId: "", defaultValue: "" };
+      if (payloadTextModal) payloadTextModal.classList.add("hidden");
+      return;
+    }
+    const sessionId = String(msg.session_id || "");
+    const defaultValue = String(msg.default || "");
+    textSessionState = {
+      active: true,
+      sessionId,
+      defaultValue,
+    };
+    if (payloadTextTitle) payloadTextTitle.textContent = msg.title || "Payload Input";
+    if (payloadTextMeta) {
+      const maxLen = Number(msg.max_len || 0);
+      payloadTextMeta.textContent = maxLen ? `Maximum ${maxLen} characters` : "Runtime text request";
+    }
+    if (payloadTextInput && payloadTextInput.value === "") {
+      payloadTextInput.value = defaultValue;
+    }
+    if (payloadTextModal) payloadTextModal.classList.remove("hidden");
+    setTimeout(() => {
+      try {
+        payloadTextInput && payloadTextInput.focus();
+        payloadTextInput && payloadTextInput.select();
+      } catch {}
+    }, 30);
+  }
+
+  function sendTextKey(payload) {
+    if (!textSessionState.active || !textSessionState.sessionId) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    try {
+      ws.send(JSON.stringify({ type: "text_key", session_id: textSessionState.sessionId, ...payload }));
+    } catch {}
+  }
+
+  function submitPayloadText() {
+    if (!payloadTextInput) return;
+    const value = String(payloadTextInput.value || "");
+    const existing = String(textSessionState.defaultValue || "");
+    for (let i = 0; i < existing.length; i += 1) {
+      sendTextKey({ special: "BACKSPACE" });
+    }
+    for (const char of value) {
+      sendTextKey({ key: char });
+    }
+    sendTextKey({ special: "ENTER" });
+    payloadTextInput.value = "";
+    if (payloadTextModal) payloadTextModal.classList.add("hidden");
+  }
+
+  function cancelPayloadText() {
+    sendTextKey({ special: "ESCAPE" });
+    if (payloadTextInput) payloadTextInput.value = "";
+    if (payloadTextModal) payloadTextModal.classList.add("hidden");
+  }
+
+  function payloadTextBackspaceOnce() {
+    sendTextKey({ special: "BACKSPACE" });
+    if (payloadTextInput) {
+      payloadTextInput.value = payloadTextInput.value.slice(0, -1);
     }
   }
 
@@ -3076,6 +3250,13 @@
       const stopBtn = e.target.closest("[data-stop]");
       if (stopBtn) stopPayload();
     });
+  if (payloadActionGrid)
+    payloadActionGrid.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-payload-action]");
+      if (!btn || btn.disabled) return;
+      const button = btn.getAttribute("data-payload-action") || "";
+      if (button) tapInput(button);
+    });
   if (payloadLogRefresh)
     payloadLogRefresh.addEventListener("click", () => loadPayloadLog());
   if (activePayloadStop)
@@ -3111,6 +3292,24 @@
   if (payloadLaunchModal)
     payloadLaunchModal.addEventListener("click", (e) => {
       if (e.target === payloadLaunchModal) closePayloadLaunch();
+    });
+  if (payloadTextSubmit)
+    payloadTextSubmit.addEventListener("click", submitPayloadText);
+  if (payloadTextCancel)
+    payloadTextCancel.addEventListener("click", cancelPayloadText);
+  if (payloadTextCancelTop)
+    payloadTextCancelTop.addEventListener("click", cancelPayloadText);
+  if (payloadTextBackspace)
+    payloadTextBackspace.addEventListener("click", payloadTextBackspaceOnce);
+  if (payloadTextInput)
+    payloadTextInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submitPayloadText();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancelPayloadText();
+      }
     });
   if (configReload)
     configReload.addEventListener("click", loadRuntimeConfig);
@@ -3273,6 +3472,7 @@
         return;
       }
       connect();
+      renderPayloadActions();
       loadPayloads();
       loadHeadlessStatus();
       loadNetworkStatus();

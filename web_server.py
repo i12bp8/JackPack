@@ -1134,6 +1134,82 @@ def _module_literal_env(tree: ast.AST) -> dict[str, object]:
     return env
 
 
+_DEFAULT_PAYLOAD_ACTIONS = [
+    {"button": "OK", "label": "Select", "description": "Confirm the highlighted action.", "group": "navigation"},
+    {"button": "KEY1", "label": "Primary", "description": "Main payload action.", "group": "actions"},
+    {"button": "KEY2", "label": "Secondary", "description": "Alternate payload action.", "group": "actions"},
+    {"button": "KEY3", "label": "Back", "description": "Back, cancel, stop, or exit.", "group": "actions"},
+    {"button": "UP", "label": "Up", "description": "Move up.", "group": "navigation"},
+    {"button": "DOWN", "label": "Down", "description": "Move down.", "group": "navigation"},
+    {"button": "LEFT", "label": "Left", "description": "Move left or previous option.", "group": "navigation"},
+    {"button": "RIGHT", "label": "Right", "description": "Move right or next option.", "group": "navigation"},
+]
+
+
+_ACTION_BUTTONS = {"UP", "DOWN", "LEFT", "RIGHT", "OK", "KEY1", "KEY2", "KEY3"}
+
+
+def _normalize_action(item: object) -> dict | None:
+    if isinstance(item, str):
+        button = item.strip().upper()
+        if button in _ACTION_BUTTONS:
+            return {"button": button, "label": button, "description": "", "group": "actions"}
+        return None
+    if not isinstance(item, dict):
+        return None
+    button = str(item.get("button") or item.get("key") or "").strip().upper()
+    if button not in _ACTION_BUTTONS:
+        return None
+    label = str(item.get("label") or item.get("name") or button).strip()[:36]
+    description = str(item.get("description") or item.get("help") or "").strip()[:120]
+    group = str(item.get("group") or ("navigation" if button in {"UP", "DOWN", "LEFT", "RIGHT", "OK"} else "actions")).strip()
+    return {"button": button, "label": label, "description": description, "group": group}
+
+
+def _actions_from_controls_text(source: str) -> list[dict]:
+    actions: list[dict] = []
+    seen: set[str] = set()
+    for raw in source.splitlines():
+        line = raw.strip().strip("#").strip()
+        match = re.match(r"^(UP|DOWN|LEFT|RIGHT|OK|KEY[123])(?:\s*/\s*(UP|DOWN|LEFT|RIGHT|OK|KEY[123]))?\s*(?:[-:=]+|--|—)\s*(.+)$", line, re.I)
+        if not match:
+            continue
+        buttons = [match.group(1).upper()]
+        if match.group(2):
+            buttons.append(match.group(2).upper())
+        description = match.group(3).strip()
+        for button in buttons:
+            if button in seen:
+                continue
+            seen.add(button)
+            label = description.split(";", 1)[0].split(",", 1)[0].strip()[:28] or button
+            actions.append({
+                "button": button,
+                "label": label,
+                "description": description[:120],
+                "group": "navigation" if button in {"UP", "DOWN", "LEFT", "RIGHT", "OK"} else "actions",
+            })
+    return actions
+
+
+def _payload_actions(tree: ast.AST, literal_env: dict[str, object], source: str) -> list[dict]:
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            if any(isinstance(t, ast.Name) and t.id == "JACKPACK_ACTIONS" for t in targets):
+                value = _ast_eval_static(node.value, literal_env)
+                if isinstance(value, (list, tuple)):
+                    normalized = [action for action in (_normalize_action(item) for item in value) if action]
+                    if normalized:
+                        return normalized
+    inferred = _actions_from_controls_text(source)
+    if inferred:
+        existing = {item["button"] for item in inferred}
+        inferred.extend(item for item in _DEFAULT_PAYLOAD_ACTIONS if item["button"] not in existing)
+        return inferred
+    return list(_DEFAULT_PAYLOAD_ACTIONS)
+
+
 def _infer_headless_fields(tree: ast.AST, meta: dict) -> list[dict]:
     fields: list[dict] = []
     has_selected_iface = False
@@ -1194,6 +1270,7 @@ def _payload_form_schema(path: Path) -> dict:
     schema = {
         "mode": "args",
         "fields": [],
+        "actions": [],
         "raw_args": True,
         "meta": meta,
     }
@@ -1203,6 +1280,7 @@ def _payload_form_schema(path: Path) -> dict:
     except Exception:
         return schema
     literal_env = _module_literal_env(tree)
+    schema["actions"] = _payload_actions(tree, literal_env, source)
 
     for node in ast.walk(tree):
         if isinstance(node, (ast.Assign, ast.AnnAssign)):
@@ -1212,6 +1290,7 @@ def _payload_form_schema(path: Path) -> dict:
                 if isinstance(value, dict):
                     value.setdefault("raw_args", True)
                     value.setdefault("meta", meta)
+                    value.setdefault("actions", schema["actions"])
                     return value
 
     fields: list[dict] = []
