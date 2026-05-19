@@ -43,6 +43,7 @@ MAC_RE = re.compile(r"(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}")
 
 JACKPACK_FORM = {
     "mode": "form",
+    "title": "Captive Portal Lab",
     "raw_args": False,
     "meta": {
         "description": "Native WebUI captive portal for authorized training. Logs visits and redacted form submissions to loot.",

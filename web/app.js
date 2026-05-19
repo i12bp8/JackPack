@@ -157,6 +157,7 @@
   const payloadCreatorFields = document.getElementById("payloadCreatorFields");
   const payloadCreatorCreate = document.getElementById("payloadCreatorCreate");
   const payloadCreatorStatus = document.getElementById("payloadCreatorStatus");
+  const payloadAuthWarningEnabled = document.getElementById("payloadAuthWarningEnabled");
   const settingsStatus = document.getElementById("settingsStatus");
   const configStatus = document.getElementById("configStatus");
   const configReload = document.getElementById("configReload");
@@ -2865,6 +2866,23 @@
     return args;
   }
 
+  function payloadChoiceValue(choice) {
+    if (choice && typeof choice === "object") {
+      return String(choice.value ?? choice.id ?? choice.label ?? "");
+    }
+    return String(choice ?? "");
+  }
+
+  function payloadChoiceLabel(choice) {
+    if (choice && typeof choice === "object") {
+      const value = payloadChoiceValue(choice);
+      const label = String(choice.label ?? value);
+      const description = String(choice.description ?? "");
+      return description ? `${label} - ${description}` : label;
+    }
+    return String(choice ?? "");
+  }
+
   function payloadFieldHtml(field, idx) {
     const name = escapeHtml(field.name || `field_${idx}`);
     const label = escapeHtml(field.label || field.name || "Option");
@@ -2914,11 +2932,16 @@
       </label>`;
     }
     if (field.type === "select" && Array.isArray(field.choices)) {
+      const placeholder = field.placeholder === false ? "" : `<option value="">${escapeHtml(field.placeholder || "Default")}</option>`;
       return `<label class="jp-field">
         <span>${label}</span>
         <select data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} ${required}>
-          <option value="">Default</option>
-          ${field.choices.map((choice) => `<option value="${escapeHtml(choice)}" ${choice === def ? "selected" : ""}>${escapeHtml(choice)}</option>`).join("")}
+          ${placeholder}
+          ${field.choices.map((choice) => {
+            const value = payloadChoiceValue(choice);
+            const choiceLabel = payloadChoiceLabel(choice);
+            return `<option value="${escapeHtml(value)}" ${value === def ? "selected" : ""}>${escapeHtml(choiceLabel)}</option>`;
+          }).join("")}
         </select>
         ${help}
       </label>`;
@@ -2943,7 +2966,7 @@
     const maxAttr = field.max === undefined || field.max === null ? "" : `max="${escapeHtml(field.max)}"`;
     return `<label class="jp-field">
       <span>${label}</span>
-      <input type="${field.type === "number" ? "number" : "text"}" data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} value="${escapeHtml(def)}" ${required} ${minAttr} ${maxAttr}>
+      <input type="${["number", "password", "email", "url", "date", "time", "color", "range"].includes(field.type) ? field.type : "text"}" data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} value="${escapeHtml(def)}" ${required} ${minAttr} ${maxAttr}>
       ${help}
     </label>`;
   }
@@ -3290,6 +3313,40 @@
     renderPayloadActions();
   }
 
+  const PAYLOAD_AUTH_WARNING_KEY = "jackpack.payloadAuthWarning";
+
+  function payloadAuthWarningIsEnabled() {
+    return localStorage.getItem(PAYLOAD_AUTH_WARNING_KEY) !== "off";
+  }
+
+  function syncPayloadAuthWarningSetting() {
+    if (payloadAuthWarningEnabled) {
+      payloadAuthWarningEnabled.checked = payloadAuthWarningIsEnabled();
+    }
+  }
+
+  function confirmAuthorizedPayloadLaunch(schema) {
+    if (!payloadAuthWarningIsEnabled()) return true;
+    const title = schema?.title || schema?.name || payloadLabel(payloadState.selectedPath || "payload");
+    return window.confirm(
+      `Authorized use only.\n\nLaunch ${title} only on systems, devices, and networks you own or have explicit permission to test. You are responsible for following your rules of engagement and local law.\n\nContinue?`,
+    );
+  }
+
+  function validatePayloadForm(formEl) {
+    if (!formEl) return "";
+    const fields = Array.from(formEl.querySelectorAll("[data-payload-field][required]"));
+    for (const field of fields) {
+      const label = field.closest("label")?.querySelector("span")?.textContent?.trim() || field.getAttribute("data-payload-field") || "Required field";
+      if (field.type === "checkbox") {
+        if (!field.checked) return `${label} is required.`;
+        continue;
+      }
+      if (!String(field.value || "").trim()) return `${label} is required.`;
+    }
+    return "";
+  }
+
   function buildPayloadArgsFromForm(formEl = null, rawEl = null) {
     const args = [];
     const env = {};
@@ -3317,6 +3374,10 @@
   async function confirmInlinePayloadLaunch() {
     const path = payloadState.selectedPath;
     if (!path) return;
+    if (!confirmAuthorizedPayloadLaunch(payloadState.selectedSchema)) {
+      if (payloadInlineStatus) payloadInlineStatus.textContent = "Launch cancelled.";
+      return;
+    }
     const workflowLaunch = buildWorkflowLaunch(payloadState.selectedSchema);
     if (workflowLaunch) {
       if (!workflowLaunch.ok) {
@@ -3327,6 +3388,11 @@
       payloadState.activeSchema = payloadState.selectedSchema || null;
       await startPayload(path, workflowLaunch.args, workflowLaunch.env);
       scrollIntoWorkbench(payloadDetailPanel);
+      return;
+    }
+    const validationError = validatePayloadForm(payloadInlineForm);
+    if (validationError) {
+      if (payloadInlineStatus) payloadInlineStatus.textContent = validationError;
       return;
     }
     const built = buildPayloadArgsFromForm(payloadInlineForm, payloadInlineRaw);
@@ -3830,6 +3896,12 @@
         return;
       }
     });
+  syncPayloadAuthWarningSetting();
+  if (payloadAuthWarningEnabled)
+    payloadAuthWarningEnabled.addEventListener("change", () => {
+      localStorage.setItem(PAYLOAD_AUTH_WARNING_KEY, payloadAuthWarningEnabled.checked ? "on" : "off");
+    });
+
   if (payloadInlineLaunch)
     payloadInlineLaunch.addEventListener("click", confirmInlinePayloadLaunch);
   if (payloadCreatorCreate)

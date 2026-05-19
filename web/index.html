@@ -496,7 +496,7 @@
             <label class="jp-field jp-field-wide">
               <span>Fields</span>
               <textarea id="payloadCreatorFields" rows="4" placeholder="target:Target:text&#10;timeout:Timeout:number&#10;save_output:Save output:checkbox"></textarea>
-              <div class="jp-field-help">One per line: name:label:type. Types: text, number, checkbox, textarea.</div>
+              <div class="jp-field-help">One per line: name:label:type. Types: text, password, email, url, number, checkbox, textarea, select. Select choices: name:label:select:quick,full.</div>
             </label>
           </div>
           <div class="mt-3 flex flex-wrap gap-2">
@@ -648,6 +648,19 @@
                 <button id="configSave" type="button" class="jp-btn jp-btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save</button>
                 <button id="configReload" type="button" class="jp-btn jp-btn-muted"><i class="fa-solid fa-rotate"></i> Reload</button>
               </div>
+            </div>
+          </details>
+
+          <details class="jp-panel jp-settings-details">
+            <summary>
+              <span><i class="fa-solid fa-shield-halved"></i> Safety</span>
+              <small>Payload launch</small>
+            </summary>
+            <div class="jp-settings-body">
+              <label class="jp-check-row">
+                <input id="payloadAuthWarningEnabled" type="checkbox" checked>
+                <span><strong>Show authorized-use warning before launching payloads</strong><small>Recommended. Reminds operators to run payloads only on systems they own or are explicitly authorized to test.</small></span>
+              </label>
             </div>
           </details>
 

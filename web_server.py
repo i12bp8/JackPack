@@ -1421,9 +1421,12 @@ def _payload_form_schema(path: Path) -> dict:
             if any(isinstance(t, ast.Name) and t.id == "JACKPACK_FORM" for t in targets):
                 value = _ast_eval_static(node.value, literal_env)
                 if isinstance(value, dict):
+                    form_meta = value.get("meta") if isinstance(value.get("meta"), dict) else {}
+                    merged_meta = {**meta, **form_meta}
                     value.setdefault("raw_args", True)
-                    value.setdefault("meta", meta)
+                    value["meta"] = merged_meta
                     value.setdefault("actions", schema["actions"])
+                    value.setdefault("requirements", {})
                     return value
 
     fields: list[dict] = []
@@ -2421,15 +2424,18 @@ class JackPackHandler(SimpleHTTPRequestHandler):
             if not full_path.is_file():
                 continue
             workflow = _workflow_schema(clean_rel_path)
+            schema = None if workflow else _payload_form_schema(full_path)
+            form_meta = schema.get("meta", {}) if isinstance(schema, dict) and isinstance(schema.get("meta"), dict) else {}
             meta = _payload_meta(full_path)
+            tags = form_meta.get("tags") if isinstance(form_meta.get("tags"), list) else None
             meta.update({
                 "headless": "native",
                 "needs_display": False,
-                "tags": ["jackpack-native", *(["wifi", "wlan1"] if workflow else [])],
-                "description": (workflow or {}).get("summary") or meta.get("description") or "JackPack-native payload.",
+                "tags": tags or ["jackpack-native", *(["wifi", "wlan1"] if workflow else [])],
+                "description": (workflow or {}).get("summary") or form_meta.get("description") or meta.get("description") or "JackPack-native payload.",
             })
             items.append({
-                "name": (workflow or {}).get("title") or full_path.stem,
+                "name": (workflow or {}).get("title") or (schema or {}).get("title") or full_path.stem.replace("_", " ").title(),
                 "path": clean_rel_path,
                 "meta": meta,
             })
@@ -2715,16 +2721,21 @@ class JackPackHandler(SimpleHTTPRequestHandler):
             name = _slugify_payload_name(parts[0])
             label = parts[1] if len(parts) > 1 and parts[1] else name.replace("_", " ").title()
             ftype = parts[2].lower() if len(parts) > 2 and parts[2] else "text"
-            if ftype not in {"text", "number", "checkbox", "textarea"}:
+            if ftype not in {"text", "number", "checkbox", "textarea", "select", "password", "url", "email"}:
                 ftype = "text"
-            fields.append({
+            field = {
                 "name": name,
                 "env": f"JACKPACK_FIELD_{name.upper()}",
                 "label": label[:60],
                 "type": ftype,
                 "default": "",
                 "required": False,
-            })
+            }
+            if ftype == "select" and len(parts) > 3:
+                choices = [choice.strip() for choice in parts[3].split(",") if choice.strip()]
+                if choices:
+                    field["choices"] = choices
+            fields.append(field)
 
         target = (NATIVE_PAYLOADS_DIR / f"{slug}.py").resolve()
         if NATIVE_PAYLOADS_DIR.resolve() not in target.parents:
@@ -2736,8 +2747,10 @@ class JackPackHandler(SimpleHTTPRequestHandler):
 
         form = {
             "mode": "form",
+            "title": title,
             "raw_args": False,
             "fields": fields,
+            "requirements": {"tools": []},
             "meta": {
                 "description": description,
                 "tags": ["jackpack-native"],
@@ -2746,26 +2759,17 @@ class JackPackHandler(SimpleHTTPRequestHandler):
         }
         source = (
             "#!/usr/bin/env python3\n"
-            "\"\"\"\n"
-            f"{description}\n"
-            "\"\"\"\n\n"
-            "import json\n"
-            "import os\n"
-            "import time\n"
-            "from pathlib import Path\n\n"
+            f"{description!r}\n\n"
+            "import os\n\n"
+            "from packjack.payload_engine import PayloadContext\n\n"
             f"JACKPACK_FORM = {repr(form)}\n\n"
-            "ROOT = Path(__file__).resolve().parents[2]\n"
-            f"LOOT_DIR = ROOT / 'loot' / 'jackpack' / '{slug}'\n\n"
             "def main():\n"
-            "    LOOT_DIR.mkdir(parents=True, exist_ok=True)\n"
-            f"    print('[JackPack] {title} started', flush=True)\n"
+            f"    ctx = PayloadContext({slug!r})\n"
+            f"    ctx.log({(title + ' started')!r})\n"
             "    env = {k: v for k, v in os.environ.items() if k.startswith('JACKPACK_')}\n"
-            "    (LOOT_DIR / 'last_env.json').write_text(json.dumps(env, indent=2), encoding='utf-8')\n"
-            "    print('[JackPack] Add payload logic here. WebUI fields are available as environment variables.', flush=True)\n"
-            "    for i in range(3):\n"
-            "        print(f'[JackPack] step {i + 1}/3', flush=True)\n"
-            "        time.sleep(0.5)\n"
-            "    print('[JackPack] done', flush=True)\n"
+            "    ctx.write_json('last_env.json', env)\n"
+            "    ctx.log('Add payload logic here. WebUI fields are available as environment variables.')\n"
+            "    ctx.heartbeat('template complete', 0)\n"
             "    return 0\n\n"
             "if __name__ == '__main__':\n"
             "    raise SystemExit(main())\n"

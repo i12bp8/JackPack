@@ -44,9 +44,10 @@ The goal is simple: no tiny screen, no button choreography, no web page pretendi
 - **Phone-first WebUI:** clean headless home screen with temperature, CPU, memory, disk, uptime, interface, payload, and log status.
 - **Connect panel:** scan from internal or external WiFi, join open or passworded networks, and protect the control AP from accidental disconnects.
 - **Friendly local URL:** installer sets up `jackpack.local` with Avahi/mDNS.
-- **Native payload runtime:** start, configure, stop, and inspect JackPack-native payloads without simulating LCD buttons.
+- **Native payload runtime:** start, configure, stop, and inspect JackPack-native payloads without simulating LCD buttons. Payload launches show an authorized-use warning by default.
 - **Payload creator:** generate WebUI-first payload skeletons under `payloads/jackpack/` and port legacy RaspyJack workflows one by one.
-- **Payload form engine:** native payloads expose structured launch fields through `JACKPACK_FORM`.
+- **Payload form engine:** native payloads expose structured launch fields through `JACKPACK_FORM`; see [`docs/PAYLOAD_ENGINE.md`](docs/PAYLOAD_ENGINE.md).
+- **First native examples:** safe captive portal lab simulation and Nmap survey payloads.
 - **Pi 5 interface policy:** `wlan0` stays control-only, `wlan1` stays payload WiFi, `eth0` stays wired target.
 - **Payload compatibility:** legacy display/input imports are quarantined under `packjack/compat/`.
 - **Loot browser:** browse runtime output and captures from the WebUI.
@@ -147,7 +148,7 @@ loot/                     Runtime output; ignored except bundled wordlists
 - Do not use `wlan0` for attacks; it is the phone-control AP.
 - Write output under `loot/<feature>/` so the WebUI can browse it.
 - Prefer non-interactive CLI/API behavior. Do not expose LCD/button workflows in the WebUI.
-- Add a `JACKPACK_FORM = {...}` dictionary when a payload needs user input; the WebUI turns those fields into launch controls.
+- Add a `JACKPACK_FORM = {...}` dictionary when a payload needs user input; the WebUI turns those fields into launch controls. Full payload engine docs live in [`docs/PAYLOAD_ENGINE.md`](docs/PAYLOAD_ENGINE.md).
 
 ## FAQ
 
