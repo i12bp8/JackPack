@@ -2156,3 +2156,126 @@ main {
     padding: 0.8rem;
   }
 }
+
+/* Dashboard compact row polish */
+#deviceTab .jp-hero {
+  margin-bottom: 0.75rem !important;
+}
+
+#deviceTab .jp-hero-main {
+  min-width: 0;
+}
+
+.jp-home-title-row h1 {
+  font-size: clamp(2.05rem, 5vw, 3.35rem) !important;
+  letter-spacing: 0 !important;
+}
+
+.jp-home-logo {
+  width: clamp(3rem, 6vw, 4.4rem) !important;
+  height: clamp(3rem, 6vw, 4.4rem) !important;
+}
+
+.jp-home-actions {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  width: 100%;
+}
+
+.jp-home-actions .jp-btn {
+  justify-content: center;
+  width: 100%;
+}
+
+.jp-home-interfaces,
+.jp-home-metrics {
+  display: grid !important;
+  gap: 0.45rem !important;
+  margin-bottom: 0.75rem !important;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.jp-home-interfaces {
+  grid-template-columns: repeat(3, minmax(108px, 1fr)) !important;
+}
+
+.jp-home-metrics {
+  grid-template-columns: repeat(5, minmax(86px, 1fr)) !important;
+}
+
+.jp-home-interfaces .jp-card,
+.jp-stat-card {
+  padding: 0.55rem 0.6rem !important;
+  border-radius: 10px !important;
+}
+
+.jp-home-interfaces .jp-card-label,
+.jp-stat-card .jp-card-label {
+  gap: 0.35rem;
+  font-size: 0.63rem !important;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.jp-home-interfaces .jp-card-value,
+.jp-stat-card .jp-card-value {
+  margin-top: 0.32rem !important;
+  font-size: clamp(0.82rem, 1.45vw, 1.02rem) !important;
+  line-height: 1.05 !important;
+}
+
+.jp-home-interfaces .jp-card-meta,
+.jp-stat-card .jp-card-meta {
+  margin-top: 0.18rem !important;
+  font-size: 0.62rem !important;
+  line-height: 1.15 !important;
+}
+
+.jp-stat-card .jp-mini-meter {
+  height: 0.22rem;
+  margin-top: 0.38rem;
+}
+
+@media (max-width: 768px) {
+  main > .flex.items-center.justify-between.mb-4.md\:mb-6 {
+    margin-bottom: 0.7rem !important;
+  }
+
+  .jp-mobile-tabbar {
+    align-items: center;
+    padding: 0.42rem 0.5rem calc(0.42rem + env(safe-area-inset-bottom)) !important;
+    min-height: 4.2rem;
+  }
+
+  .jp-mobile-tabbar button {
+    align-content: center;
+    align-items: center;
+    justify-items: center;
+    min-height: 3.15rem !important;
+    padding: 0.48rem 0.2rem 0.38rem !important;
+  }
+
+  .jp-mobile-tabbar i {
+    line-height: 1;
+    margin-top: 0 !important;
+  }
+
+  .jp-home-actions {
+    grid-template-columns: 1fr !important;
+  }
+
+  .jp-home-actions .jp-btn {
+    min-height: 2.65rem;
+  }
+
+  .jp-home-interfaces {
+    grid-template-columns: repeat(3, minmax(112px, 1fr)) !important;
+  }
+
+  .jp-home-metrics {
+    grid-template-columns: repeat(5, minmax(82px, 1fr)) !important;
+  }
+}
