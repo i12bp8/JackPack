@@ -1,6 +1,10 @@
 # JackPack
 
 <p align="center">
+  <img alt="JackPack logo" src="docs/assets/jackpacklogo.png" width="180">
+</p>
+
+<p align="center">
   <strong>Headless Raspberry Pi 5 field toolkit forked from RaspyJack</strong><br>
   <sub>Phone-first WebUI • Pi 5 networking • Authorized red-team workflows</sub>
 </p>
@@ -16,8 +20,6 @@
   <strong>Open the deck from your phone at <code>http://jackpack.local:8080</code></strong><br>
   <sub>Fallback on the control AP: <code>http://10.66.0.1:8080</code></sub>
 </p>
-
-<img alt="JackPack banner" src="docs/assets/jackpack.png">
 
 ## Overview
 
