@@ -26,7 +26,6 @@
   const navTerminal = document.getElementById("navTerminal");
   const navLoot = document.getElementById("navLoot");
   const navSettings = document.getElementById("navSettings");
-  const navPayloadStudio = document.getElementById("navPayloadStudio");
   const sidebar = document.getElementById("sidebar");
   const sidebarBackdrop = document.getElementById("sidebarBackdrop");
   const menuToggle = document.getElementById("menuToggle");
@@ -119,6 +118,17 @@
   const attackWifiMeta = document.getElementById("attackWifiMeta");
   const wiredValue = document.getElementById("wiredValue");
   const wiredMeta = document.getElementById("wiredMeta");
+  const homeTempValue = document.getElementById("homeTempValue");
+  const homeCpuValue = document.getElementById("homeCpuValue");
+  const homeCpuBar = document.getElementById("homeCpuBar");
+  const homeMemValue = document.getElementById("homeMemValue");
+  const homeMemMeta = document.getElementById("homeMemMeta");
+  const homeMemBar = document.getElementById("homeMemBar");
+  const homeDiskValue = document.getElementById("homeDiskValue");
+  const homeDiskMeta = document.getElementById("homeDiskMeta");
+  const homeDiskBar = document.getElementById("homeDiskBar");
+  const homeUptimeValue = document.getElementById("homeUptimeValue");
+  const homeLoadValue = document.getElementById("homeLoadValue");
   const networkStatus = document.getElementById("networkStatus");
   const networkIface = document.getElementById("networkIface");
   const networkScan = document.getElementById("networkScan");
@@ -140,6 +150,12 @@
   const payloadTextCancel = document.getElementById("payloadTextCancel");
   const payloadTextCancelTop = document.getElementById("payloadTextCancelTop");
   const payloadTextBackspace = document.getElementById("payloadTextBackspace");
+  const payloadCreatorName = document.getElementById("payloadCreatorName");
+  const payloadCreatorIface = document.getElementById("payloadCreatorIface");
+  const payloadCreatorDescription = document.getElementById("payloadCreatorDescription");
+  const payloadCreatorFields = document.getElementById("payloadCreatorFields");
+  const payloadCreatorCreate = document.getElementById("payloadCreatorCreate");
+  const payloadCreatorStatus = document.getElementById("payloadCreatorStatus");
   const settingsStatus = document.getElementById("settingsStatus");
   const configStatus = document.getElementById("configStatus");
   const configReload = document.getElementById("configReload");
@@ -714,6 +730,12 @@
     }
   }
 
+  function setPayloadCreatorStatus(txt) {
+    if (!payloadCreatorStatus) return;
+    payloadCreatorStatus.textContent = txt;
+    applyStatusTone(payloadCreatorStatus, txt);
+  }
+
   function payloadLabel(path) {
     const raw = String(path || "");
     const base = raw.split("/").pop() || raw || "payload";
@@ -1280,6 +1302,7 @@
       const diskPct = pct(diskUsed, diskTotal);
 
       if (sysCpuValue) sysCpuValue.textContent = `${cpu.toFixed(1)}%`;
+      if (homeCpuValue) homeCpuValue.textContent = `${cpu.toFixed(1)}%`;
       if (sysTempValue) {
         if (data.temp_c === null || data.temp_c === undefined) {
           sysTempValue.textContent = "--.- C";
@@ -1287,23 +1310,43 @@
           sysTempValue.textContent = `${Number(data.temp_c).toFixed(1)} C`;
         }
       }
+      if (homeTempValue) {
+        homeTempValue.textContent =
+          data.temp_c === null || data.temp_c === undefined
+            ? "--.- C"
+            : `${Number(data.temp_c).toFixed(1)} C`;
+      }
       bar(sysCpuBar, cpu);
+      bar(homeCpuBar, cpu);
 
       if (sysMemValue) sysMemValue.textContent = `${memPct.toFixed(1)}%`;
       if (sysMemMeta)
         sysMemMeta.textContent = `${formatBytes(memUsed)} / ${formatBytes(memTotal)}`;
       bar(sysMemBar, memPct);
+      if (homeMemValue) homeMemValue.textContent = `${memPct.toFixed(1)}%`;
+      if (homeMemMeta)
+        homeMemMeta.textContent = `${formatBytes(memUsed)} / ${formatBytes(memTotal)}`;
+      bar(homeMemBar, memPct);
 
       if (sysDiskValue) sysDiskValue.textContent = `${diskPct.toFixed(1)}%`;
       if (sysDiskMeta)
         sysDiskMeta.textContent = `${formatBytes(diskUsed)} / ${formatBytes(diskTotal)}`;
       bar(sysDiskBar, diskPct);
+      if (homeDiskValue) homeDiskValue.textContent = `${diskPct.toFixed(1)}%`;
+      if (homeDiskMeta)
+        homeDiskMeta.textContent = `${formatBytes(diskUsed)} / ${formatBytes(diskTotal)}`;
+      bar(homeDiskBar, diskPct);
 
       if (sysUptime) sysUptime.textContent = formatDuration(data.uptime_s);
+      if (homeUptimeValue) homeUptimeValue.textContent = formatDuration(data.uptime_s);
       if (sysLoad)
         sysLoad.textContent = Array.isArray(data.load)
           ? data.load.join(", ")
           : "-";
+      if (homeLoadValue)
+        homeLoadValue.textContent = Array.isArray(data.load)
+          ? `Load ${data.load.join(", ")}`
+          : "Load -";
       if (sysPayload)
         sysPayload.textContent = data.payload_running
           ? data.payload_path || "running"
@@ -2601,6 +2644,41 @@
     }
   }
 
+  async function createNativePayload() {
+    const title = payloadCreatorName ? payloadCreatorName.value.trim() : "";
+    if (!title) {
+      setPayloadCreatorStatus("Name required");
+      if (payloadCreatorName) payloadCreatorName.focus();
+      return;
+    }
+    setPayloadCreatorStatus("Creating...");
+    try {
+      const res = await apiFetch(getApiUrl("/api/payloads/native"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          description: payloadCreatorDescription ? payloadCreatorDescription.value : "",
+          iface_kind: payloadCreatorIface ? payloadCreatorIface.value : "none",
+          fields: payloadCreatorFields ? payloadCreatorFields.value : "",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data && data.error ? data.error : "create_failed");
+      }
+      setPayloadCreatorStatus("Created");
+      if (payloadCreatorName) payloadCreatorName.value = "";
+      if (payloadCreatorDescription) payloadCreatorDescription.value = "";
+      if (payloadCreatorFields) payloadCreatorFields.value = "";
+      payloadState.schemaCache = {};
+      await loadPayloads();
+      if (data.path) selectPayload(data.path, { scroll: true });
+    } catch (e) {
+      setPayloadCreatorStatus(e && e.message ? e.message : "Create failed");
+    }
+  }
+
   function renderPayloadSidebar() {
     if (!payloadSidebar) return;
     const cats = payloadState.categories || [];
@@ -3643,8 +3721,6 @@
       }
     });
   });
-  if (navPayloadStudio)
-    navPayloadStudio.href = "./ide.html" + getForwardSearch();
   if (menuToggle)
     menuToggle.addEventListener("click", () => setSidebarOpen(true));
   if (sidebarBackdrop)
@@ -3744,6 +3820,8 @@
     });
   if (payloadInlineLaunch)
     payloadInlineLaunch.addEventListener("click", confirmInlinePayloadLaunch);
+  if (payloadCreatorCreate)
+    payloadCreatorCreate.addEventListener("click", createNativePayload);
   if (payloadInlineForm) {
     payloadInlineForm.addEventListener("click", handleWorkflowFormClick);
     payloadInlineForm.addEventListener("change", handleWorkflowFormChange);
@@ -3937,7 +4015,7 @@
     if (systemPollTimer) clearTimeout(systemPollTimer);
     const delay = document.hidden ? 10000 : 3000;
     systemPollTimer = setTimeout(async () => {
-      if (systemOpen) {
+      if (activeTab === "device" || systemOpen) {
         await loadSystemStatus();
       }
       scheduleSystemPoll();
@@ -3946,7 +4024,7 @@
 
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
-      if (systemOpen) loadSystemStatus();
+      if (activeTab === "device" || systemOpen) loadSystemStatus();
       pollPayloadStatus();
       loadHeadlessStatus();
       loadPayloadLog();
@@ -3964,6 +4042,7 @@
       connect();
       renderPayloadActions();
       loadPayloads();
+      loadSystemStatus();
       loadHeadlessStatus();
       loadNetworkStatus();
       pollPayloadStatus().then(() => loadPayloadLog()).catch(() => loadPayloadLog());

@@ -11,7 +11,6 @@ fi
 FILES=(
   "$ROOT_DIR/web/shared.js"
   "$ROOT_DIR/web/app.js"
-  "$ROOT_DIR/web/ide.js"
 )
 
 for file in "${FILES[@]}"; do

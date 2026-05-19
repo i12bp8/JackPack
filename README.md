@@ -23,7 +23,7 @@
 
 ## Overview
 
-JackPack is a Raspberry Pi 5-first, headless fork of **RaspyJack**. It keeps the payload ecosystem, but removes the Pi Zero handheld/LCD workflow as the primary product. The target build is a Pi 5 in a backpack or field case, powered by a battery, controlled from a phone over the Pi's internal WiFi access point, and using the Pi 5 Ethernet port plus an external USB WiFi adapter for authorized testing work.
+JackPack is a Raspberry Pi 5-first, headless fork of **RaspyJack**. The legacy RaspyJack payload collection is kept as porting source, but the WebUI only exposes JackPack-native payloads that have been adapted for structured browser setup, live output, and Pi 5 interface roles. The target build is a Pi 5 in a backpack or field case, powered by a battery, controlled from a phone over the Pi's internal WiFi access point, and using the Pi 5 Ethernet port plus an external USB WiFi adapter for authorized testing work.
 
 The goal is simple: no tiny screen, no button choreography, no web page pretending to be an LCD. JackPack is a clean control deck for a headless Pi 5.
 
@@ -41,11 +41,12 @@ The goal is simple: no tiny screen, no button choreography, no web page pretendi
 
 ## Features
 
-- **Phone-first WebUI:** modern headless dashboard for launch/status/logging.
+- **Phone-first WebUI:** clean headless home screen with temperature, CPU, memory, disk, uptime, interface, payload, and log status.
 - **Connect panel:** scan from internal or external WiFi, join open or passworded networks, and protect the control AP from accidental disconnects.
 - **Friendly local URL:** installer sets up `jackpack.local` with Avahi/mDNS.
-- **Direct payload runtime:** start, configure, stop, and inspect payloads without simulating LCD buttons.
-- **Payload form engine:** payloads can expose structured launch fields through `JACKPACK_FORM`; JackPack also auto-detects common `argparse` options.
+- **Native payload runtime:** start, configure, stop, and inspect JackPack-native payloads without simulating LCD buttons.
+- **Payload creator:** generate WebUI-first payload skeletons under `payloads/jackpack/` and port legacy RaspyJack workflows one by one.
+- **Payload form engine:** native payloads expose structured launch fields through `JACKPACK_FORM`.
 - **Pi 5 interface policy:** `wlan0` stays control-only, `wlan1` stays payload WiFi, `eth0` stays wired target.
 - **Payload compatibility:** legacy display/input imports are quarantined under `packjack/compat/`.
 - **Loot browser:** browse runtime output and captures from the WebUI.
@@ -113,8 +114,10 @@ The installer configures the Pi 5 for the intended JackPack layout:
 
 ## WebUI Controls
 
-- **Dashboard:** payload launchpad, active payload state, logs, and on-demand terminal.
+- **Home:** system health, interface roles, active payload state, and live output.
 - **Connect:** pick `wlan0` or `wlan1`, scan nearby WiFi, connect to open or secured networks, and disconnect safely. JackPack blocks control-AP changes unless you explicitly allow them.
+- **Payloads:** only JackPack-native payloads are shown. Legacy RaspyJack scripts remain in the repo as porting source until adapted.
+- **Terminal:** fast on-demand shell with common field shortcuts.
 - **Config:** edit AP SSID, AP password, hostname, interface roles, and service ports from the browser.
 - **Updater:** fast-forward pull from GitHub, optionally re-apply JackPack services, and restart the WebUI after updating.
 - **Diagnostics:** run a field-readiness check before an engagement or after swapping adapters.
@@ -124,7 +127,7 @@ The installer configures the Pi 5 for the intended JackPack layout:
 ```text
 packjack/                 Headless runtime modules and compatibility shims
 web/                      JackPack WebUI
-payloads/                 RaspyJack-compatible payload collection
+payloads/                 Legacy payload source plus payloads/jackpack native ports
 extensions/               Reusable payload gates/actions
 wifi/                     WiFi/interface helper modules
 vendor/                   Third-party tools used by payloads
@@ -136,14 +139,15 @@ loot/                     Runtime output; ignored except bundled wordlists
 
 ## Payload Porting Rules
 
-- Keep payloads in `payloads/<category>/<name>.py`.
+- Put runnable WebUI-first JackPack payloads in `payloads/jackpack/<name>.py`.
+- Keep legacy RaspyJack payloads in their original folders as porting source until they are adapted.
 - Put shared helpers in `payloads/_*.py`, `extensions/`, or `packjack/`.
 - Use `JACKPACK_ATTACK_IFACE`, then `PACKJACK_ATTACK_IFACE`, then `wlan1` for WiFi payload work.
 - Use `JACKPACK_WIRED_IFACE`, then `eth0` for wired payload work.
 - Do not use `wlan0` for attacks; it is the phone-control AP.
 - Write output under `loot/<feature>/` so the WebUI can browse it.
-- Prefer non-interactive CLI/API behavior. If a legacy payload still expects LCD/buttons, keep it compatible through `packjack.compat` and mark it as compat.
-- Add a `JACKPACK_FORM = {...}` dictionary or normal `argparse` options when a payload needs user input; the WebUI turns those into launch fields automatically.
+- Prefer non-interactive CLI/API behavior. Do not expose LCD/button workflows in the WebUI.
+- Add a `JACKPACK_FORM = {...}` dictionary when a payload needs user input; the WebUI turns those fields into launch controls.
 
 ## FAQ
 

@@ -9,7 +9,6 @@ After installation, open `http://jackpack.local:8080` from a device connected to
 ## Entry Points
 
 - `index.html`: phone-first control deck.
-- `ide.html`: payload editor.
 - `wardriving.html`: wardriving session viewer.
 - `pcap.html` / `pcap-analyzer.html`: packet capture tools.
 
@@ -27,6 +26,7 @@ Served by `web_server.py`:
 - `/api/network/connect`
 - `/api/network/disconnect`
 - `/api/payloads/list`
+- `/api/payloads/native`
 - `/api/payloads/schema`
 - `/api/payloads/start`
 - `/api/payloads/stop`

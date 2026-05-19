@@ -63,6 +63,7 @@ ROOT_DIR = Path(__file__).resolve().parent
 WEB_DIR = ROOT_DIR / "web"
 LOOT_DIR = ROOT_DIR / "loot"
 PAYLOADS_DIR = ROOT_DIR / "payloads"
+NATIVE_PAYLOADS_DIR = PAYLOADS_DIR / "jackpack"
 PAYLOAD_STATE_PATH = Path("/dev/shm/rj_payload_state.json")
 DISCORD_WEBHOOK_PATH = ROOT_DIR / "discord_webhook.txt"
 WIGLE_CREDENTIALS_PATH = ROOT_DIR / ".wigle_credentials.json"
@@ -215,6 +216,25 @@ def _workflow_schema(rel_path: str) -> dict | None:
     return None
 
 
+def _native_payload_rel_paths() -> list[str]:
+    paths: list[str] = []
+    if NATIVE_PAYLOADS_DIR.exists():
+        for path in sorted(NATIVE_PAYLOADS_DIR.glob("*.py"), key=lambda p: p.name.lower()):
+            if path.name.startswith("_"):
+                continue
+            try:
+                paths.append(str(path.relative_to(PAYLOADS_DIR)).replace("\\", "/"))
+            except Exception:
+                continue
+    return paths
+
+
+def _slugify_payload_name(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9_]+", "_", str(value or "").strip().lower())
+    slug = re.sub(r"_+", "_", slug).strip("_")
+    return slug[:48] or "new_payload"
+
+
 def _load_shared_token() -> str | None:
     """Load auth token from env first, then token file."""
     env_token = str(os.environ.get("RJ_WS_TOKEN", "")).strip()
@@ -302,7 +322,6 @@ def _get_webui_bind_addrs() -> list[tuple[str, str]]:
     addrs.append(("127.0.0.1", "lo"))
     return addrs
 PREVIEW_MAX_BYTES = int(os.environ.get("RJ_LOOT_PREVIEW_MAX", str(200 * 1024)))
-PAYLOAD_MAX_BYTES = int(os.environ.get("RJ_PAYLOAD_MAX", str(512 * 1024)))
 TEXT_EXTS = {
     ".txt", ".log", ".md", ".json", ".csv", ".conf", ".ini", ".yaml", ".yml",
     ".pcapng.txt", ".xml", ".sqlite", ".db", ".out", ".py", ".sh"
@@ -2129,11 +2148,6 @@ class JackPackHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
-        if parsed.path == "/ide":
-            self.path = "/ide.html" + (f"?{parsed.query}" if parsed.query else "")
-            super().do_GET()
-            return
-
         if (
             parsed.path.startswith("/api/loot/")
             or parsed.path.startswith("/api/payloads/")
@@ -2164,12 +2178,6 @@ class JackPackHandler(SimpleHTTPRequestHandler):
                 return
             if parsed.path == "/api/payloads/log":
                 self._handle_payloads_log(query)
-                return
-            if parsed.path == "/api/payloads/tree":
-                self._handle_payloads_tree()
-                return
-            if parsed.path == "/api/payloads/file":
-                self._handle_payloads_file_get(query)
                 return
             if parsed.path == "/api/payloads/schema":
                 self._handle_payloads_schema(query)
@@ -2323,24 +2331,17 @@ class JackPackHandler(SimpleHTTPRequestHandler):
                 return
             self._handle_payloads_stop()
             return
-        if parsed.path == "/api/payloads/entry":
+        if parsed.path == "/api/payloads/native":
             query = parse_qs(parsed.query or "")
             if not _auth_ok(self, query):
                 _json_response(self, {"error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
                 return
-            self._handle_payloads_entry_create()
+            self._handle_payloads_native_create()
             return
         _json_response(self, {"error": "not found"}, status=HTTPStatus.NOT_FOUND)
 
     def do_PUT(self):
         parsed = urlparse(self.path)
-        if parsed.path == "/api/payloads/file":
-            query = parse_qs(parsed.query or "")
-            if not _auth_ok(self, query):
-                _json_response(self, {"error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
-                return
-            self._handle_payloads_file_put()
-            return
         if parsed.path == "/api/settings/discord_webhook":
             query = parse_qs(parsed.query or "")
             if not _auth_ok(self, query):
@@ -2368,28 +2369,6 @@ class JackPackHandler(SimpleHTTPRequestHandler):
                 _json_response(self, {"error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
                 return
             self._handle_settings_runtime_put()
-            return
-        _json_response(self, {"error": "not found"}, status=HTTPStatus.NOT_FOUND)
-
-    def do_PATCH(self):
-        parsed = urlparse(self.path)
-        if parsed.path == "/api/payloads/entry":
-            query = parse_qs(parsed.query or "")
-            if not _auth_ok(self, query):
-                _json_response(self, {"error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
-                return
-            self._handle_payloads_entry_rename()
-            return
-        _json_response(self, {"error": "not found"}, status=HTTPStatus.NOT_FOUND)
-
-    def do_DELETE(self):
-        parsed = urlparse(self.path)
-        if parsed.path == "/api/payloads/entry":
-            query = parse_qs(parsed.query or "")
-            if not _auth_ok(self, query):
-                _json_response(self, {"error": "unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
-                return
-            self._handle_payloads_entry_delete(query)
             return
         _json_response(self, {"error": "not found"}, status=HTTPStatus.NOT_FOUND)
 
@@ -2432,82 +2411,35 @@ class JackPackHandler(SimpleHTTPRequestHandler):
         if cached and (time.time() - float(_PAYLOAD_LIST_CACHE.get("ts") or 0)) < 5:
             _json_response(self, cached)
             return
-        categories: dict[str, list[dict]] = {}
+        items: list[dict] = []
         if not PAYLOADS_DIR.exists():
             _json_response(self, {"categories": []})
             return
 
-        for root, dirs, files in os.walk(PAYLOADS_DIR):
-            dirs[:] = [d for d in dirs if not d.startswith(".") and d != "__pycache__"]
-            rel_dir = os.path.relpath(root, PAYLOADS_DIR)
-            category = rel_dir.split(os.sep)[0] if rel_dir != "." else "general"
-            for name in files:
-                if not name.endswith(".py") or name.startswith("_"):
-                    continue
-                rel_path = os.path.join(rel_dir, name) if rel_dir != "." else name
-                full_path = Path(root) / name
-                clean_rel_path = rel_path.replace("\\", "/")
-                workflow = _workflow_schema(clean_rel_path)
-                meta = _payload_meta(full_path)
-                if workflow:
-                    meta.update({
-                        "headless": "native",
-                        "needs_display": False,
-                        "uses_wifi": True,
-                        "uses_external_wifi": True,
-                        "tags": ["web-native", "wifi", "wlan1"],
-                        "description": workflow.get("summary", ""),
-                    })
-                categories.setdefault(category, []).append({
-                    "name": os.path.splitext(name)[0],
-                    "path": clean_rel_path,
-                    "meta": meta,
-                })
-
-        order = [
-            "reconnaissance",
-            "wifi",
-            "network",
-            "credentials",
-            "exfiltration",
-            "remote_access",
-            "evasion",
-            "bluetooth",
-            "nfc_rfid",
-            "sdr",
-            "usb",
-            "hardware",
-            "utilities",
-            "ai",
-            "games",
-            "examples",
-            "payloads",
-            "general",
-        ]
-
-        payload_categories = []
-        for cat in order:
-            items = categories.get(cat, [])
-            if not items:
+        for clean_rel_path in _native_payload_rel_paths():
+            full_path = (PAYLOADS_DIR / clean_rel_path).resolve()
+            if not full_path.is_file():
                 continue
-            label, description = _CATEGORY_INFO.get(cat, (cat.replace("_", " ").title(), ""))
-            payload_categories.append({
-                "id": cat,
-                "label": label,
-                "description": description,
-                "items": sorted(items, key=lambda x: x["name"].lower()),
+            workflow = _workflow_schema(clean_rel_path)
+            meta = _payload_meta(full_path)
+            meta.update({
+                "headless": "native",
+                "needs_display": False,
+                "tags": ["jackpack-native", *(["wifi", "wlan1"] if workflow else [])],
+                "description": (workflow or {}).get("summary") or meta.get("description") or "JackPack-native payload.",
+            })
+            items.append({
+                "name": (workflow or {}).get("title") or full_path.stem,
+                "path": clean_rel_path,
+                "meta": meta,
             })
 
-        for cat in sorted(categories.keys()):
-            if cat in order:
-                continue
-            label, description = _CATEGORY_INFO.get(cat, (cat.replace("_", " ").title(), ""))
-            payload_categories.append({
-                "id": cat,
-                "label": label,
-                "description": description,
-                "items": sorted(categories[cat], key=lambda x: x["name"].lower()),
-            })
+        payload_categories = [{
+            "id": "jackpack",
+            "label": "JackPack",
+            "description": "Native WebUI payloads only. Legacy RaspyJack payloads are source material for porting.",
+            "items": sorted(items, key=lambda x: x["name"].lower()),
+        }]
 
         payload = {"categories": payload_categories}
         _PAYLOAD_LIST_CACHE["payload"] = payload
@@ -2518,6 +2450,13 @@ class JackPackHandler(SimpleHTTPRequestHandler):
         raw = query.get("path", [""])[0]
         target = _safe_payload_path(raw)
         if target is None or not target.is_file():
+            _json_response(self, {"error": "payload not found"}, status=HTTPStatus.NOT_FOUND)
+            return
+        try:
+            if NATIVE_PAYLOADS_DIR.resolve() not in target.resolve().parents:
+                _json_response(self, {"error": "payload not ported"}, status=HTTPStatus.NOT_FOUND)
+                return
+        except Exception:
             _json_response(self, {"error": "payload not found"}, status=HTTPStatus.NOT_FOUND)
             return
         try:
@@ -2729,204 +2668,117 @@ class JackPackHandler(SimpleHTTPRequestHandler):
         )
         _json_response(self, payload, status=HTTPStatus.OK if ok else HTTPStatus.CONFLICT)
 
-    def _payload_tree_node(self, base: Path, current: Path) -> dict:
-        rel = "" if current == base else str(current.relative_to(base)).replace("\\", "/")
-        node = {
-            "name": current.name if current != base else base.name,
-            "path": rel,
-            "type": "dir" if current.is_dir() else "file",
-        }
-        if current.is_dir():
-            children = []
-            try:
-                entries = sorted(current.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
-            except Exception:
-                entries = []
-            for entry in entries:
-                if entry.name.startswith(".") or entry.name == "__pycache__":
-                    continue
-                if entry.is_file() and entry.suffix.lower() in (".pyc",):
-                    continue
-                children.append(self._payload_tree_node(base, entry))
-            node["children"] = children
-        return node
+    def _handle_payloads_native_create(self) -> None:
+        body = _read_json(self)
+        if body is None:
+            _json_response(self, {"error": "invalid json"}, status=HTTPStatus.BAD_REQUEST)
+            return
 
-    def _handle_payloads_tree(self) -> None:
-        if not PAYLOADS_DIR.exists():
-            _json_response(self, {"name": "payloads", "path": "", "type": "dir", "children": []})
+        title = str(body.get("title") or "").strip()
+        if not title:
+            _json_response(self, {"error": "name required"}, status=HTTPStatus.BAD_REQUEST)
             return
-        try:
-            _json_response(self, self._payload_tree_node(PAYLOADS_DIR, PAYLOADS_DIR))
-        except Exception as exc:
-            _json_response(self, {"error": f"read error: {exc}"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+        slug = _slugify_payload_name(body.get("slug") or title)
+        description = str(body.get("description") or "JackPack native payload.").strip()[:240]
+        iface_kind = str(body.get("iface_kind") or "none").strip().lower()
+        if iface_kind not in {"none", "wifi", "wired"}:
+            iface_kind = "none"
+        raw_fields = str(body.get("fields") or "").strip()
 
-    def _handle_payloads_file_get(self, query: dict) -> None:
-        raw = unquote(query.get("path", [""])[0])
-        target = _safe_payload_path(raw)
-        if target is None or not target.exists() or not target.is_file():
-            _json_response(self, {"error": "not found"}, status=HTTPStatus.NOT_FOUND)
-            return
-        if target.stat().st_size > PAYLOAD_MAX_BYTES:
-            _json_response(self, {"error": "file too large"}, status=HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
-            return
-        if not _is_text_file(target):
-            _json_response(self, {"error": "not text"}, status=HTTPStatus.UNSUPPORTED_MEDIA_TYPE)
-            return
-        try:
-            content = target.read_text(encoding="utf-8", errors="replace")
-            rel = str(target.relative_to(PAYLOADS_DIR)).replace("\\", "/")
-            st = target.stat()
-            _json_response(self, {
-                "path": rel,
-                "content": content,
-                "size": st.st_size,
-                "mtime": int(st.st_mtime),
+        fields: list[dict] = []
+        if iface_kind == "wifi":
+            fields.append({
+                "name": "iface",
+                "env": "JACKPACK_SELECTED_IFACE",
+                "label": "WiFi Adapter",
+                "type": "interface",
+                "iface_type": "wifi",
+                "default": _env_first("JACKPACK_ATTACK_IFACE", "PACKJACK_ATTACK_IFACE", default="wlan1"),
+                "help": "External USB WiFi adapter.",
+                "allow_control_iface": False,
             })
-        except Exception as exc:
-            _json_response(self, {"error": f"read error: {exc}"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+        elif iface_kind == "wired":
+            fields.append({
+                "name": "iface",
+                "env": "JACKPACK_SELECTED_IFACE",
+                "label": "Ethernet",
+                "type": "interface",
+                "iface_type": "wired",
+                "default": _env_first("JACKPACK_WIRED_IFACE", "PACKJACK_WIRED_IFACE", default="eth0"),
+                "help": "Built-in Pi 5 Ethernet.",
+            })
 
-    def _handle_payloads_file_put(self) -> None:
-        body = _read_json(self)
-        if body is None:
-            _json_response(self, {"error": "invalid json"}, status=HTTPStatus.BAD_REQUEST)
-            return
+        for line in raw_fields.splitlines():
+            parts = [part.strip() for part in line.split(":")]
+            if not parts or not parts[0]:
+                continue
+            name = _slugify_payload_name(parts[0])
+            label = parts[1] if len(parts) > 1 and parts[1] else name.replace("_", " ").title()
+            ftype = parts[2].lower() if len(parts) > 2 and parts[2] else "text"
+            if ftype not in {"text", "number", "checkbox", "textarea"}:
+                ftype = "text"
+            fields.append({
+                "name": name,
+                "env": f"JACKPACK_FIELD_{name.upper()}",
+                "label": label[:60],
+                "type": ftype,
+                "default": "",
+                "required": False,
+            })
 
-        rel_path = str(body.get("path", "")).strip().lstrip("/").replace("\\", "/")
-        content = body.get("content", "")
-        if not rel_path:
-            _json_response(self, {"error": "missing path"}, status=HTTPStatus.BAD_REQUEST)
-            return
-        if not isinstance(content, str):
-            _json_response(self, {"error": "content must be string"}, status=HTTPStatus.BAD_REQUEST)
-            return
-        if len(content.encode("utf-8", "ignore")) > PAYLOAD_MAX_BYTES:
-            _json_response(self, {"error": "content too large"}, status=HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
-            return
-
-        target = _safe_payload_path(rel_path)
-        if target is None:
-            _json_response(self, {"error": "invalid path"}, status=HTTPStatus.BAD_REQUEST)
-            return
-        if target.exists() and not target.is_file():
-            _json_response(self, {"error": "not a file"}, status=HTTPStatus.BAD_REQUEST)
-            return
-        if not target.parent.exists():
-            _json_response(self, {"error": "parent folder missing"}, status=HTTPStatus.CONFLICT)
-            return
-        try:
-            target.write_text(content, encoding="utf-8")
-            rel = str(target.relative_to(PAYLOADS_DIR)).replace("\\", "/")
-            st = target.stat()
-            _json_response(self, {"ok": True, "path": rel, "size": st.st_size, "mtime": int(st.st_mtime)})
-        except Exception as exc:
-            _json_response(self, {"error": f"write error: {exc}"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-    def _handle_payloads_entry_create(self) -> None:
-        body = _read_json(self)
-        if body is None:
-            _json_response(self, {"error": "invalid json"}, status=HTTPStatus.BAD_REQUEST)
-            return
-
-        rel_path = str(body.get("path", "")).strip().lstrip("/").replace("\\", "/")
-        entry_type = str(body.get("type", "")).strip().lower()
-        content = body.get("content", "")
-        if not rel_path or entry_type not in ("file", "dir"):
-            _json_response(self, {"error": "invalid request"}, status=HTTPStatus.BAD_REQUEST)
-            return
-
-        target = _safe_payload_path(rel_path)
-        if target is None:
+        target = (NATIVE_PAYLOADS_DIR / f"{slug}.py").resolve()
+        if NATIVE_PAYLOADS_DIR.resolve() not in target.parents:
             _json_response(self, {"error": "invalid path"}, status=HTTPStatus.BAD_REQUEST)
             return
         if target.exists():
-            _json_response(self, {"error": "already exists"}, status=HTTPStatus.CONFLICT)
+            _json_response(self, {"error": "payload already exists"}, status=HTTPStatus.CONFLICT)
             return
 
+        form = {
+            "mode": "form",
+            "raw_args": False,
+            "fields": fields,
+            "meta": {
+                "description": description,
+                "tags": ["jackpack-native"],
+                "headless": "native",
+            },
+        }
+        source = (
+            "#!/usr/bin/env python3\n"
+            "\"\"\"\n"
+            f"{description}\n"
+            "\"\"\"\n\n"
+            "import json\n"
+            "import os\n"
+            "import time\n"
+            "from pathlib import Path\n\n"
+            f"JACKPACK_FORM = {repr(form)}\n\n"
+            "ROOT = Path(__file__).resolve().parents[2]\n"
+            f"LOOT_DIR = ROOT / 'loot' / 'jackpack' / '{slug}'\n\n"
+            "def main():\n"
+            "    LOOT_DIR.mkdir(parents=True, exist_ok=True)\n"
+            f"    print('[JackPack] {title} started', flush=True)\n"
+            "    env = {k: v for k, v in os.environ.items() if k.startswith('JACKPACK_')}\n"
+            "    (LOOT_DIR / 'last_env.json').write_text(json.dumps(env, indent=2), encoding='utf-8')\n"
+            "    print('[JackPack] Add payload logic here. WebUI fields are available as environment variables.', flush=True)\n"
+            "    for i in range(3):\n"
+            "        print(f'[JackPack] step {i + 1}/3', flush=True)\n"
+            "        time.sleep(0.5)\n"
+            "    print('[JackPack] done', flush=True)\n"
+            "    return 0\n\n"
+            "if __name__ == '__main__':\n"
+            "    raise SystemExit(main())\n"
+        )
         try:
-            if entry_type == "dir":
-                target.mkdir(parents=True, exist_ok=False)
-                rel = str(target.relative_to(PAYLOADS_DIR)).replace("\\", "/")
-                _json_response(self, {"ok": True, "type": "dir", "path": rel})
-                return
-
-            if not isinstance(content, str):
-                _json_response(self, {"error": "content must be string"}, status=HTTPStatus.BAD_REQUEST)
-                return
-            if len(content.encode("utf-8", "ignore")) > PAYLOAD_MAX_BYTES:
-                _json_response(self, {"error": "content too large"}, status=HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
-                return
-            if not target.parent.exists():
-                _json_response(self, {"error": "parent folder missing"}, status=HTTPStatus.CONFLICT)
-                return
-            target.write_text(content, encoding="utf-8")
+            NATIVE_PAYLOADS_DIR.mkdir(parents=True, exist_ok=True)
+            target.write_text(source, encoding="utf-8")
+            os.chmod(target, 0o755)
+            _PAYLOAD_LIST_CACHE["payload"] = None
             rel = str(target.relative_to(PAYLOADS_DIR)).replace("\\", "/")
-            st = target.stat()
-            _json_response(self, {"ok": True, "type": "file", "path": rel, "size": st.st_size, "mtime": int(st.st_mtime)})
+            _json_response(self, {"ok": True, "path": rel})
         except Exception as exc:
             _json_response(self, {"error": f"create error: {exc}"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-    def _handle_payloads_entry_rename(self) -> None:
-        body = _read_json(self)
-        if body is None:
-            _json_response(self, {"error": "invalid json"}, status=HTTPStatus.BAD_REQUEST)
-            return
-
-        old_rel = str(body.get("old_path", "")).strip().lstrip("/").replace("\\", "/")
-        new_rel = str(body.get("new_path", "")).strip().lstrip("/").replace("\\", "/")
-        if not old_rel or not new_rel:
-            _json_response(self, {"error": "missing path"}, status=HTTPStatus.BAD_REQUEST)
-            return
-
-        old_target = _safe_payload_path(old_rel)
-        new_target = _safe_payload_path(new_rel)
-        if old_target is None or new_target is None:
-            _json_response(self, {"error": "invalid path"}, status=HTTPStatus.BAD_REQUEST)
-            return
-        if not old_target.exists():
-            _json_response(self, {"error": "not found"}, status=HTTPStatus.NOT_FOUND)
-            return
-        if new_target.exists():
-            _json_response(self, {"error": "destination exists"}, status=HTTPStatus.CONFLICT)
-            return
-        if not new_target.parent.exists():
-            _json_response(self, {"error": "parent folder missing"}, status=HTTPStatus.CONFLICT)
-            return
-
-        try:
-            old_target.rename(new_target)
-            _json_response(self, {
-                "ok": True,
-                "old_path": str(old_target.relative_to(PAYLOADS_DIR)).replace("\\", "/"),
-                "new_path": str(new_target.relative_to(PAYLOADS_DIR)).replace("\\", "/"),
-            })
-        except Exception as exc:
-            _json_response(self, {"error": f"rename error: {exc}"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-    def _handle_payloads_entry_delete(self, query: dict) -> None:
-        raw = unquote(query.get("path", [""])[0])
-        target = _safe_payload_path(raw)
-        if target is None or not target.exists():
-            _json_response(self, {"error": "not found"}, status=HTTPStatus.NOT_FOUND)
-            return
-
-        try:
-            if target.is_dir():
-                try:
-                    next(target.iterdir())
-                    _json_response(self, {"error": "directory not empty"}, status=HTTPStatus.CONFLICT)
-                    return
-                except StopIteration:
-                    pass
-                target.rmdir()
-                rel = "" if target == PAYLOADS_DIR else str(target.relative_to(PAYLOADS_DIR)).replace("\\", "/")
-                _json_response(self, {"ok": True, "type": "dir", "path": rel})
-                return
-
-            target.unlink()
-            rel = str(target.relative_to(PAYLOADS_DIR)).replace("\\", "/")
-            _json_response(self, {"ok": True, "type": "file", "path": rel})
-        except Exception as exc:
-            _json_response(self, {"error": f"delete error: {exc}"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
     def _handle_loot_download(self, query: dict) -> None:
         raw = unquote(query.get("path", [""])[0])
