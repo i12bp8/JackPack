@@ -208,7 +208,6 @@
         <button id="navSettings" type="button" class="jp-nav-item"><i class="fa-solid fa-sliders"></i><span>Settings</span></button>
 
         <div class="pt-2 mt-2 border-t border-slate-800/70">
-          <a href="./wardriving.html" class="jp-nav-item jp-nav-secondary"><i class="fa-solid fa-satellite-dish"></i><span>Map</span></a>
           <a href="./pcap.html" class="jp-nav-item jp-nav-secondary"><i class="fa-solid fa-magnifying-glass-chart"></i><span>PCAP</span></a>
         </div>
 
@@ -281,9 +280,9 @@
 
     <main class="flex-1 px-4 py-6 md:px-8">
       <div class="flex items-center justify-between mb-4 md:mb-6 px-3 py-2 border border-slate-800/70 bg-slate-950/45 backdrop-blur rounded-xl">
-        <div class="flex items-center gap-2 text-[11px] text-slate-300">
-          <i class="fa-solid fa-terminal text-emerald-400"></i>
-          <span class="tracking-wide">JACKPACK</span>
+        <div class="flex items-center gap-2 text-[11px] text-slate-400">
+          <i class="fa-solid fa-circle text-[7px] text-emerald-300"></i>
+          <span id="topbarStatus" class="tracking-wide">Ready</span>
         </div>
         <div class="flex items-center gap-2">
           <button id="menuToggle" type="button" class="md:hidden px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-600/40 text-slate-200"><i class="fa-solid fa-bars"></i></button>
@@ -304,8 +303,13 @@
       <div id="deviceTab" class="block">
         <section class="jp-hero mb-4 md:mb-6">
           <div class="jp-hero-main">
-            <div class="text-[11px] uppercase tracking-[0.18em] text-emerald-300">Status</div>
-            <h1>JackPack</h1>
+            <div class="jp-home-title-row">
+              <img src="./jackpacklogo.png" alt="JackPack" class="jp-home-logo">
+              <div>
+                <div class="text-[11px] uppercase tracking-[0.18em] text-emerald-300">Home</div>
+                <h1>Control Deck</h1>
+              </div>
+            </div>
             <div class="jp-hero-meta">
               <span id="headlessMode">Checking</span>
               <span id="headlessAp">AP</span>
@@ -325,7 +329,7 @@
           </div>
         </section>
 
-        <section class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4 md:mb-6">
+        <section class="jp-home-interfaces mb-4 md:mb-6">
           <div class="jp-card">
             <div class="jp-card-label"><i class="fa-solid fa-wifi"></i> Phone AP</div>
             <div id="controlApValue" class="jp-card-value">wlan0</div>
@@ -344,29 +348,28 @@
         </section>
 
         <section class="jp-home-metrics mb-4 md:mb-6">
-          <div class="jp-card">
+          <div class="jp-card jp-stat-card jp-stat-temp">
             <div class="jp-card-label"><i class="fa-solid fa-temperature-half"></i> Temp</div>
             <div id="homeTempValue" class="jp-card-value">--.- C</div>
-            <div class="jp-card-meta">SoC</div>
           </div>
-          <div class="jp-card">
+          <div class="jp-card jp-stat-card jp-stat-cpu">
             <div class="jp-card-label"><i class="fa-solid fa-microchip"></i> CPU</div>
             <div id="homeCpuValue" class="jp-card-value">0%</div>
             <div class="jp-mini-meter"><span id="homeCpuBar"></span></div>
           </div>
-          <div class="jp-card">
+          <div class="jp-card jp-stat-card jp-stat-mem">
             <div class="jp-card-label"><i class="fa-solid fa-memory"></i> Memory</div>
             <div id="homeMemValue" class="jp-card-value">0%</div>
             <div id="homeMemMeta" class="jp-card-meta">0 / 0</div>
             <div class="jp-mini-meter"><span id="homeMemBar"></span></div>
           </div>
-          <div class="jp-card">
+          <div class="jp-card jp-stat-card jp-stat-disk">
             <div class="jp-card-label"><i class="fa-solid fa-hard-drive"></i> Disk</div>
             <div id="homeDiskValue" class="jp-card-value">0%</div>
             <div id="homeDiskMeta" class="jp-card-meta">0 / 0</div>
             <div class="jp-mini-meter"><span id="homeDiskBar"></span></div>
           </div>
-          <div class="jp-card">
+          <div class="jp-card jp-stat-card jp-stat-time">
             <div class="jp-card-label"><i class="fa-solid fa-clock"></i> Uptime</div>
             <div id="homeUptimeValue" class="jp-card-value">0m</div>
             <div id="homeLoadValue" class="jp-card-meta">Load -</div>
@@ -392,7 +395,6 @@
       <div id="payloadTab" class="hidden space-y-4">
         <section class="jp-page-head jp-page-head-compact">
           <div class="min-w-0">
-            <div class="jp-kicker">Run</div>
             <h1>Payloads</h1>
             <div id="payloadSummary" class="jp-hero-meta">
               <span>Loading payloads</span>
@@ -408,22 +410,18 @@
           <div class="jp-panel jp-category-panel">
             <div class="jp-panel-head">
               <div>
-                <div class="jp-panel-title">Native Payloads</div>
-                <div class="jp-panel-subtitle">Only JackPack-ready workflows are shown.</div>
+                <div class="jp-panel-title">Library</div>
+                <div class="jp-panel-subtitle">Native JackPack workflows only.</div>
               </div>
             </div>
             <label class="jp-field">
-                <span>Search</span>
+              <span>Search</span>
               <input id="payloadSearch" type="search" autocomplete="off" placeholder="Filter payloads">
             </label>
-            <div id="payloadCategoryList" class="jp-category-list mt-3"></div>
             <div id="payloadBrowserPanel" class="jp-payload-browser mt-3">
-              <div class="jp-panel-head jp-panel-head-tight">
-                <div class="min-w-0">
-                  <div id="payloadCategoryTitle" class="jp-panel-title">Payloads</div>
-                  <div id="payloadCategoryDescription" class="jp-panel-subtitle">Select a category.</div>
-                </div>
-              </div>
+              <div id="payloadCategoryList" class="hidden"></div>
+              <div id="payloadCategoryTitle" class="hidden">Payloads</div>
+              <div id="payloadCategoryDescription" class="jp-panel-subtitle mt-2">Pick a payload to configure it.</div>
               <div id="payloadQuickGrid" class="jp-payload-list"></div>
             </div>
           </div>
@@ -479,15 +477,12 @@
           </div>
         </section>
 
-        <section class="jp-panel">
-          <div class="jp-panel-head">
-            <div>
-              <div class="jp-panel-title">Create Native Payload</div>
-              <div class="jp-panel-subtitle">Generate a WebUI-first skeleton under <code>payloads/jackpack/</code>.</div>
-            </div>
-            <div id="payloadCreatorStatus" class="jp-panel-subtitle">Ready</div>
-          </div>
-          <div class="jp-form-grid">
+        <details class="jp-panel jp-settings-details">
+          <summary>
+            <span><i class="fa-solid fa-plus"></i> Create Native Payload</span>
+            <small id="payloadCreatorStatus">Ready</small>
+          </summary>
+          <div class="jp-form-grid mt-3">
             <label class="jp-field">
               <span>Name</span>
               <input id="payloadCreatorName" type="text" autocomplete="off" placeholder="Network Snapshot">
@@ -513,7 +508,7 @@
           <div class="mt-3 flex flex-wrap gap-2">
             <button id="payloadCreatorCreate" type="button" class="jp-btn jp-btn-primary"><i class="fa-solid fa-plus"></i> Create Payload</button>
           </div>
-        </section>
+        </details>
       </div>
 
       <!-- Terminal -->
@@ -640,132 +635,124 @@
       <div id="settingsTab" class="hidden">
         <section class="jp-page-head jp-page-head-compact mb-4">
           <div class="min-w-0">
-            <div class="jp-kicker">Config</div>
             <h1>Settings</h1>
             <div class="jp-hero-meta">
-              <span>AP</span>
-              <span>Update</span>
-              <span>Integrations</span>
+              <span>Closed by default</span>
+              <span>Open only what you need</span>
             </div>
           </div>
         </section>
-        <div class="jp-settings-grid">
-          <div class="jp-panel jp-settings-main">
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="text-sm font-semibold text-emerald-300">Runtime</div>
-              <div class="text-[11px] text-slate-500">Saved env values.</div>
-            </div>
-          </div>
 
-          <div class="jp-settings-section">
-            <div class="flex items-center justify-between gap-3 mb-3">
-              <div>
-                <div class="text-xs font-semibold text-slate-200">Network Defaults</div>
-                <div class="text-[11px] text-slate-500">Restart services after changing AP values.</div>
+        <div class="jp-settings-stack">
+          <details class="jp-panel jp-settings-details">
+            <summary>
+              <span><i class="fa-solid fa-network-wired"></i> Network Defaults</span>
+              <small id="configStatus">Ready</small>
+            </summary>
+            <div class="jp-settings-body">
+              <div class="jp-panel-subtitle mb-3">Interface roles and control AP values. Restart services after changing AP settings.</div>
+              <div class="jp-form-grid">
+                <label class="jp-field"><span>Control AP Interface</span><input id="configApIface" type="text" autocomplete="off" placeholder="wlan0"></label>
+                <label class="jp-field"><span>External WiFi Interface</span><input id="configAttackIface" type="text" autocomplete="off" placeholder="wlan1"></label>
+                <label class="jp-field"><span>Built-in Ethernet</span><input id="configWiredIface" type="text" autocomplete="off" placeholder="eth0"></label>
+                <label class="jp-field"><span>AP SSID</span><input id="configApSsid" type="text" autocomplete="off" placeholder="JackPack"></label>
+                <label class="jp-field"><span>AP Password</span><input id="configApPassword" type="password" autocomplete="new-password" placeholder="New AP password"></label>
+                <label class="jp-field"><span>Hostname</span><input id="configHostname" type="text" autocomplete="off" placeholder="jackpack"></label>
+                <label class="jp-field"><span>AP Address</span><input id="configApAddress" type="text" autocomplete="off" placeholder="10.66.0.1/24"></label>
+                <label class="jp-field"><span>AP Channel</span><input id="configApChannel" type="number" min="1" max="165" placeholder="6"></label>
+                <label class="jp-field"><span>WebUI Port</span><input id="configWebPort" type="number" min="1" max="65535" placeholder="8080"></label>
+                <label class="jp-field"><span>WebSocket Port</span><input id="configWsPort" type="number" min="1" max="65535" placeholder="8765"></label>
               </div>
-              <div id="configStatus" class="text-[11px] text-slate-400">Ready</div>
-            </div>
-            <div class="jp-form-grid">
-              <label class="jp-field"><span>Control AP Interface</span><input id="configApIface" type="text" autocomplete="off" placeholder="wlan0"></label>
-              <label class="jp-field"><span>External WiFi Interface</span><input id="configAttackIface" type="text" autocomplete="off" placeholder="wlan1"></label>
-              <label class="jp-field"><span>Built-in Ethernet</span><input id="configWiredIface" type="text" autocomplete="off" placeholder="eth0"></label>
-              <label class="jp-field"><span>AP SSID</span><input id="configApSsid" type="text" autocomplete="off" placeholder="JackPack"></label>
-              <label class="jp-field"><span>AP Password</span><input id="configApPassword" type="password" autocomplete="new-password" placeholder="New AP password"></label>
-              <label class="jp-field"><span>Hostname</span><input id="configHostname" type="text" autocomplete="off" placeholder="jackpack"></label>
-              <label class="jp-field"><span>AP Address</span><input id="configApAddress" type="text" autocomplete="off" placeholder="10.66.0.1/24"></label>
-              <label class="jp-field"><span>AP Channel</span><input id="configApChannel" type="number" min="1" max="165" placeholder="6"></label>
-              <label class="jp-field"><span>WebUI Port</span><input id="configWebPort" type="number" min="1" max="65535" placeholder="8080"></label>
-              <label class="jp-field"><span>WebSocket Port</span><input id="configWsPort" type="number" min="1" max="65535" placeholder="8765"></label>
-            </div>
-            <div class="mt-3 flex flex-wrap gap-2">
-              <button id="configSave" type="button" class="jp-btn jp-btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Config</button>
-              <button id="configReload" type="button" class="jp-btn jp-btn-muted"><i class="fa-solid fa-rotate"></i> Reload</button>
-            </div>
-          </div>
-
-          <div class="jp-settings-section">
-            <div class="flex items-center justify-between gap-3 mb-3">
-              <div>
-                <div class="text-xs font-semibold text-slate-200">Update</div>
-                <div class="text-[11px] text-slate-500">Needs internet on wlan1 or eth0.</div>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button id="configSave" type="button" class="jp-btn jp-btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+                <button id="configReload" type="button" class="jp-btn jp-btn-muted"><i class="fa-solid fa-rotate"></i> Reload</button>
               </div>
-              <div id="updateStatus" class="text-[11px] text-slate-400">Ready</div>
             </div>
-            <div id="updateNetworkHint" class="jp-update-hint hidden">
-              No internet link detected. Connect first.
-              <button type="button" class="jp-inline-link" data-jp-tab="network">Open Connect</button>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <button id="updatePull" type="button" class="jp-btn jp-btn-primary"><i class="fa-solid fa-cloud-arrow-down"></i> Pull Latest</button>
-              <button id="updateApply" type="button" class="jp-btn"><i class="fa-solid fa-screwdriver-wrench"></i> Pull + Apply Services</button>
-              <button id="updateRestart" type="button" class="jp-btn jp-btn-muted"><i class="fa-solid fa-power-off"></i> Restart WebUI</button>
-            </div>
-            <pre id="updateOutput" class="jp-log mt-3 min-h-[8rem] max-h-[14rem]">No update run yet.</pre>
-          </div>
+          </details>
 
-          <div class="jp-settings-section">
-            <div class="flex items-center justify-between gap-3 mb-3">
-              <div>
-                <div class="text-xs font-semibold text-slate-200">Diagnostics</div>
-                <div class="text-[11px] text-slate-500">Services, tools, interfaces, Git.</div>
+          <details class="jp-panel jp-settings-details">
+            <summary>
+              <span><i class="fa-solid fa-cloud-arrow-down"></i> Update</span>
+              <small id="updateStatus">Ready</small>
+            </summary>
+            <div class="jp-settings-body">
+              <div id="updateNetworkHint" class="jp-update-hint hidden">
+                No internet link detected on wlan1 or eth0.
+                <button type="button" class="jp-inline-link" data-jp-tab="network">Open Connect</button>
+                <button type="button" class="jp-inline-link" id="updateRefreshNetwork">Recheck</button>
               </div>
-              <div id="diagnosticsStatus" class="text-[11px] text-slate-400">Ready</div>
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <div id="diagnosticsSummary" class="flex flex-wrap gap-2">
-                <span class="jp-pill">No run yet</span>
+              <div class="flex flex-wrap gap-2">
+                <button id="updatePull" type="button" class="jp-btn jp-btn-primary"><i class="fa-solid fa-cloud-arrow-down"></i> Pull Latest</button>
+                <button id="updateApply" type="button" class="jp-btn"><i class="fa-solid fa-screwdriver-wrench"></i> Pull + Apply Services</button>
+                <button id="updateRestart" type="button" class="jp-btn jp-btn-muted"><i class="fa-solid fa-power-off"></i> Restart WebUI</button>
               </div>
-              <button id="diagnosticsRun" type="button" class="jp-btn"><i class="fa-solid fa-stethoscope"></i> Run Checks</button>
+              <pre id="updateOutput" class="jp-log jp-settings-log mt-3">No update run yet.</pre>
             </div>
-          <div id="diagnosticsList" class="jp-diag-list mt-3">
-              <div class="text-xs text-slate-500">No diagnostics loaded yet.</div>
-            </div>
-          </div>
-          </div>
+          </details>
 
-          <div class="jp-panel jp-settings-side">
-          <div class="jp-settings-section">
-            <div class="text-xs font-semibold text-slate-200 mb-2">Discord Webhook</div>
-            <label for="discordWebhookInput" class="block text-[11px] text-slate-400 mb-1">Webhook URL</label>
-            <input id="discordWebhookInput" type="password" autocomplete="off" placeholder="https://discord.com/api/webhooks/..." class="w-full px-3 py-2 rounded-lg bg-slate-900/70 border border-slate-700/60 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400/50">
-            <div class="mt-2 flex items-center gap-2">
-              <button id="discordWebhookSave" type="button" class="px-3 py-1.5 text-xs rounded-lg bg-emerald-600/80 border border-emerald-300/30 text-white hover:bg-emerald-500/80 transition">Save</button>
-              <button id="discordWebhookClear" type="button" class="px-3 py-1.5 text-xs rounded-lg bg-slate-800/80 border border-slate-600/40 text-slate-200 hover:bg-slate-700/80 transition">Clear</button>
-              <div id="settingsStatus" class="text-[11px] text-slate-400">Ready</div>
+          <details class="jp-panel jp-settings-details">
+            <summary>
+              <span><i class="fa-solid fa-stethoscope"></i> Diagnostics</span>
+              <small id="diagnosticsStatus">Ready</small>
+            </summary>
+            <div class="jp-settings-body">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div id="diagnosticsSummary" class="flex flex-wrap gap-2">
+                  <span class="jp-pill">No run yet</span>
+                </div>
+                <button id="diagnosticsRun" type="button" class="jp-btn"><i class="fa-solid fa-stethoscope"></i> Run Checks</button>
+              </div>
+              <div id="diagnosticsList" class="jp-diag-list mt-3">
+                <div class="text-xs text-slate-500">No diagnostics loaded yet.</div>
+              </div>
             </div>
-          </div>
+          </details>
 
-          <div class="jp-settings-section">
-            <div class="text-xs font-semibold text-slate-200 mb-2">WiGLE Upload</div>
-            <label for="wigleApiNameInput" class="block text-[11px] text-slate-400 mb-1">API Name</label>
-            <input id="wigleApiNameInput" type="password" autocomplete="off" placeholder="WiGLE API name" class="w-full px-3 py-2 rounded-lg bg-slate-900/70 border border-slate-700/60 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400/50">
-            <label for="wigleApiTokenInput" class="block text-[11px] text-slate-400 mb-1 mt-2">API Token</label>
-            <input id="wigleApiTokenInput" type="password" autocomplete="off" placeholder="WiGLE API token" class="w-full px-3 py-2 rounded-lg bg-slate-900/70 border border-slate-700/60 text-slate-100 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400/50">
-            <p class="mt-2 text-[11px] text-slate-500">Leave blank to keep saved values.</p>
-            <div class="mt-2 flex items-center gap-2">
-              <button id="wigleSave" type="button" class="px-3 py-1.5 text-xs rounded-lg bg-emerald-600/80 border border-emerald-300/30 text-white hover:bg-emerald-500/80 transition">Save</button>
-              <button id="wigleClear" type="button" class="px-3 py-1.5 text-xs rounded-lg bg-slate-800/80 border border-slate-600/40 text-slate-200 hover:bg-slate-700/80 transition">Clear</button>
-              <div id="wigleSettingsStatus" class="text-[11px] text-slate-400">Not configured</div>
+          <details class="jp-panel jp-settings-details">
+            <summary>
+              <span><i class="fa-brands fa-discord"></i> Discord Webhook</span>
+              <small id="settingsStatus">Ready</small>
+            </summary>
+            <div class="jp-settings-body">
+              <label class="jp-field"><span>Webhook URL</span><input id="discordWebhookInput" type="password" autocomplete="off" placeholder="https://discord.com/api/webhooks/..."></label>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button id="discordWebhookSave" type="button" class="jp-btn jp-btn-primary">Save</button>
+                <button id="discordWebhookClear" type="button" class="jp-btn jp-btn-muted">Clear</button>
+              </div>
             </div>
-          </div>
+          </details>
 
-          <div class="jp-settings-section">
-            <div class="flex items-center justify-between mb-2">
-              <div class="text-xs font-semibold text-slate-200">Tailscale</div>
-              <div id="tailscaleSettingsStatus" class="text-[11px] text-slate-400">Not installed</div>
+          <details class="jp-panel jp-settings-details">
+            <summary>
+              <span><i class="fa-solid fa-location-dot"></i> WiGLE Upload</span>
+              <small id="wigleSettingsStatus">Not configured</small>
+            </summary>
+            <div class="jp-settings-body">
+              <div class="jp-form-grid">
+                <label class="jp-field"><span>API Name</span><input id="wigleApiNameInput" type="password" autocomplete="off" placeholder="WiGLE API name"></label>
+                <label class="jp-field"><span>API Token</span><input id="wigleApiTokenInput" type="password" autocomplete="off" placeholder="WiGLE API token"></label>
+              </div>
+              <div class="jp-field-help mt-2">Leave blank to keep saved values.</div>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button id="wigleSave" type="button" class="jp-btn jp-btn-primary">Save</button>
+                <button id="wigleClear" type="button" class="jp-btn jp-btn-muted">Clear</button>
+              </div>
             </div>
-            <p class="text-[11px] text-slate-400 mb-2">Remote access with an auth key.</p>
-            <div class="flex flex-wrap gap-2">
-              <button id="tailscaleInstallBtn" type="button" class="px-3 py-1.5 text-xs rounded-lg bg-emerald-600/80 border border-emerald-300/30 text-white hover:bg-emerald-500/80 transition">
-                Install Tailscale
-              </button>
-              <button id="tailscaleReauthBtn" type="button" class="px-3 py-1.5 text-xs rounded-lg bg-slate-800/80 border border-slate-600/40 text-slate-200 hover:bg-slate-700/80 transition hidden">
-                Re-authenticate with new key
-              </button>
+          </details>
+
+          <details class="jp-panel jp-settings-details">
+            <summary>
+              <span><i class="fa-solid fa-route"></i> Tailscale</span>
+              <small id="tailscaleSettingsStatus">Not installed</small>
+            </summary>
+            <div class="jp-settings-body">
+              <div class="jp-panel-subtitle mb-3">Remote access with a Tailscale auth key.</div>
+              <div class="flex flex-wrap gap-2">
+                <button id="tailscaleInstallBtn" type="button" class="jp-btn jp-btn-primary">Install Tailscale</button>
+                <button id="tailscaleReauthBtn" type="button" class="jp-btn jp-btn-muted hidden">Re-authenticate</button>
+              </div>
             </div>
-          </div>
-          </div>
+          </details>
         </div>
       </div>
 

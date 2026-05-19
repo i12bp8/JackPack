@@ -1955,3 +1955,204 @@ main {
     min-height: 22rem;
   }
 }
+
+/* JackPack clean UX pass */
+.jp-home-title-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.jp-home-logo {
+  width: clamp(3.4rem, 7vw, 5.6rem);
+  height: clamp(3.4rem, 7vw, 5.6rem);
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.jp-home-title-row h1 {
+  margin: 0.05rem 0 0;
+  font-size: clamp(2rem, 5vw, 3.8rem);
+}
+
+.jp-home-interfaces {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.jp-home-interfaces .jp-card,
+.jp-stat-card {
+  min-height: 0;
+  padding: 0.75rem 0.85rem !important;
+}
+
+.jp-home-interfaces .jp-card-value,
+.jp-stat-card .jp-card-value {
+  font-size: clamp(1rem, 2vw, 1.25rem) !important;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.jp-home-metrics {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.jp-stat-temp .jp-card-label i,
+.jp-stat-cpu .jp-card-label i {
+  color: var(--jp-green);
+}
+
+.jp-stat-mem .jp-card-label i,
+.jp-stat-time .jp-card-label i {
+  color: var(--jp-purple);
+}
+
+.jp-stat-disk .jp-card-label i {
+  color: #fff;
+}
+
+.jp-stat-mem .jp-mini-meter span {
+  background: var(--jp-purple);
+}
+
+.jp-stat-disk .jp-mini-meter span {
+  background: #f7f8ff;
+}
+
+.jp-settings-grid,
+.jp-settings-stack {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.jp-settings-details {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.jp-settings-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3.35rem;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.jp-settings-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.jp-settings-details > summary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #fff;
+  font-weight: 900;
+}
+
+.jp-settings-details > summary i {
+  color: var(--jp-green);
+  width: 1rem;
+  text-align: center;
+}
+
+.jp-settings-details > summary small {
+  color: var(--jp-muted);
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+.jp-settings-details[open] > summary {
+  border-bottom: 1px solid var(--jp-line);
+}
+
+.jp-settings-body {
+  padding: 1rem;
+}
+
+.jp-settings-log {
+  min-height: 7rem !important;
+  max-height: 13rem !important;
+}
+
+.jp-payload-workbench {
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+}
+
+.jp-payload-list {
+  display: grid;
+  gap: 0.55rem;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.jp-payload-card {
+  padding: 0.8rem !important;
+}
+
+.jp-payload-desc,
+.jp-tag-row-compact,
+.jp-payload-path {
+  margin-top: 0.35rem;
+}
+
+.jp-selected-payload-card {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.jp-detail-section,
+.jp-run-card {
+  padding: 0.9rem !important;
+}
+
+@media (max-width: 1100px) {
+  .jp-home-interfaces,
+  .jp-home-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .jp-home-title-row {
+    align-items: flex-start;
+  }
+
+  .jp-home-logo {
+    width: 3.2rem;
+    height: 3.2rem;
+  }
+
+  .jp-home-interfaces,
+  .jp-home-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .jp-home-interfaces .jp-card,
+  .jp-stat-card {
+    padding: 0.7rem 0.8rem !important;
+  }
+
+  .jp-payload-workbench {
+    gap: 0.75rem;
+  }
+
+  .jp-settings-details > summary {
+    padding: 0.8rem;
+  }
+
+  .jp-settings-body {
+    padding: 0.8rem;
+  }
+}

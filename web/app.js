@@ -19,6 +19,7 @@
   window.addEventListener("resize", setupHiDPI);
   const statusEl = document.getElementById("status");
   const statusEls = document.querySelectorAll(".status-text");
+  const topbarStatus = document.getElementById("topbarStatus");
   const navDevice = document.getElementById("navDevice");
   const navSystem = document.getElementById("navSystem");
   const navNetwork = document.getElementById("navNetwork");
@@ -173,6 +174,7 @@
   const updateStatus = document.getElementById("updateStatus");
   const updateOutput = document.getElementById("updateOutput");
   const updateNetworkHint = document.getElementById("updateNetworkHint");
+  const updateRefreshNetwork = document.getElementById("updateRefreshNetwork");
   const updatePull = document.getElementById("updatePull");
   const updateApply = document.getElementById("updateApply");
   const updateRestart = document.getElementById("updateRestart");
@@ -694,6 +696,10 @@
   }
 
   function setStatus(txt) {
+    if (topbarStatus) {
+      topbarStatus.textContent = txt;
+      applyStatusTone(topbarStatus, txt);
+    }
     if (statusEl) {
       statusEl.textContent = txt;
       applyStatusTone(statusEl, txt);
@@ -1293,11 +1299,11 @@
         throw new Error(data && data.error ? data.error : "system_failed");
       }
 
-      const cpu = Number(data.cpu_percent || 0);
-      const memUsed = Number(data.mem_used || 0);
-      const memTotal = Number(data.mem_total || 0);
-      const diskUsed = Number(data.disk_used || 0);
-      const diskTotal = Number(data.disk_total || 0);
+      const cpu = Number(data.cpu_percent ?? data.cpu ?? 0);
+      const memUsed = Number(data.mem_used ?? data.memory_used ?? data.memory?.used ?? 0);
+      const memTotal = Number(data.mem_total ?? data.memory_total ?? data.memory?.total ?? 0);
+      const diskUsed = Number(data.disk_used ?? data.disk?.used ?? 0);
+      const diskTotal = Number(data.disk_total ?? data.disk?.total ?? 0);
       const memPct = pct(memUsed, memTotal);
       const diskPct = pct(diskUsed, diskTotal);
 
@@ -1370,6 +1376,14 @@
       setSystemStatus("Live");
     } catch (e) {
       setSystemStatus("Unavailable");
+      if (homeCpuValue) homeCpuValue.textContent = "--";
+      if (homeTempValue) homeTempValue.textContent = "--.- C";
+      if (homeMemValue) homeMemValue.textContent = "--";
+      if (homeMemMeta) homeMemMeta.textContent = "Unavailable";
+      if (homeDiskValue) homeDiskValue.textContent = "--";
+      if (homeDiskMeta) homeDiskMeta.textContent = "Unavailable";
+      if (homeUptimeValue) homeUptimeValue.textContent = "--";
+      if (homeLoadValue) homeLoadValue.textContent = "Load --";
     }
   }
 
@@ -1827,7 +1841,7 @@
   }
 
   async function ensureInternetForUpdate() {
-    const ifaces = await loadNetworkStatus({ silent: true });
+    const ifaces = await loadNetworkStatus({ silent: true, force: true });
     const ok = hasInternetCandidate(ifaces);
     if (updateNetworkHint) updateNetworkHint.classList.toggle("hidden", ok);
     if (ok) return true;
@@ -1840,8 +1854,6 @@
 
   async function startUpdate(applyInstaller = false) {
     if (!(await ensureInternetForUpdate())) {
-      setActiveTab("network");
-      await loadNetworkStatus({ force: true });
       return;
     }
     setUpdateStatus("Starting...");
@@ -2775,7 +2787,7 @@
     }
     const total = allPayloadItems().length;
     if (payloadSummary) {
-      payloadSummary.innerHTML = `<span>${total} payloads</span><span>${cats.length} categories</span>`;
+      payloadSummary.innerHTML = `<span>${total} native payload${total === 1 ? "" : "s"}</span>`;
     }
     if (payloadCategoryTitle) {
       payloadCategoryTitle.textContent = query
@@ -3883,6 +3895,8 @@
     configReload.addEventListener("click", loadRuntimeConfig);
   if (configSave)
     configSave.addEventListener("click", saveRuntimeConfig);
+  if (updateRefreshNetwork)
+    updateRefreshNetwork.addEventListener("click", () => ensureInternetForUpdate());
   if (updatePull)
     updatePull.addEventListener("click", () => startUpdate(false));
   if (updateApply)
