@@ -612,7 +612,8 @@ input,
 textarea,
 select,
 .jp-field input,
-.jp-field select {
+.jp-field select,
+.jp-field textarea {
   background: #070b16 !important;
   border-color: var(--jp-line) !important;
   color: var(--jp-text) !important;
@@ -626,26 +627,26 @@ select:focus {
 }
 
 .jp-category-list {
-  display: grid;
-  gap: 0.55rem;
-  max-height: 62vh;
-  overflow: auto;
-  padding-right: 0.15rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
 }
 
 .jp-category-card {
-  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   text-align: left;
   border: 1px solid var(--jp-line);
   background: #070b16;
-  border-radius: 12px;
-  padding: 0.85rem;
+  border-radius: 999px;
+  padding: 0.45rem 0.65rem;
 }
 
 .jp-category-card:hover,
 .jp-category-active {
-  border-color: rgba(179, 107, 255, 0.55);
-  background: rgba(179, 107, 255, 0.1);
+  border-color: rgba(88, 255, 176, 0.55);
+  background: rgba(88, 255, 176, 0.08);
 }
 
 .jp-category-top {
@@ -656,7 +657,7 @@ select:focus {
 }
 
 .jp-category-title {
-  font-size: 0.9rem;
+  font-size: 0.78rem;
   font-weight: 850;
 }
 
@@ -667,13 +668,12 @@ select:focus {
 }
 
 .jp-category-meta {
-  margin-top: 0.25rem;
-  font-size: 0.72rem;
+  display: none;
 }
 
 .jp-payload-list {
   display: grid;
-  gap: 0.65rem;
+  gap: 0.45rem;
 }
 
 .jp-action-grid {
@@ -729,10 +729,10 @@ select:focus {
 
 .jp-payload-card {
   min-height: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   border-color: var(--jp-line);
   background: #070b16;
-  padding: 0.8rem;
+  padding: 0.62rem;
 }
 
 .jp-payload-row {
@@ -743,10 +743,14 @@ select:focus {
 }
 
 .jp-payload-desc {
-  margin-top: 0.35rem;
+  margin-top: 0.25rem;
   color: var(--jp-muted);
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   line-height: 1.35;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .jp-tag {
@@ -1303,6 +1307,15 @@ main {
   letter-spacing: 0;
 }
 
+.jp-page-head-compact {
+  min-height: 0;
+  padding: 0.9rem 1rem;
+}
+
+.jp-page-head-compact h1 {
+  font-size: clamp(1.7rem, 3.2vw, 2.6rem);
+}
+
 .jp-kicker,
 .jp-mini-title {
   color: var(--jp-green);
@@ -1314,31 +1327,39 @@ main {
 
 .jp-payload-workbench {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 430px);
+  grid-template-columns: minmax(290px, 360px) minmax(0, 1fr);
   gap: 1rem;
   align-items: start;
 }
 
 .jp-category-panel {
-  grid-column: 1 / -1;
+  grid-column: auto;
+  position: sticky;
+  top: 1rem;
 }
 
 .jp-category-panel .jp-category-list {
   display: flex;
-  gap: 0.6rem;
+  flex-wrap: wrap;
+  gap: 0.45rem;
   max-height: none;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 0.2rem;
 }
 
 .jp-category-panel .jp-category-card {
-  min-width: 13rem;
+  min-width: 0;
 }
 
 .jp-active-run-panel {
   position: sticky;
   top: 1rem;
+}
+
+.jp-payload-browser {
+  min-width: 0;
+}
+
+.jp-panel-head-tight {
+  margin-top: 0.1rem;
 }
 
 .jp-run-card {
@@ -1359,10 +1380,15 @@ main {
 
 .jp-selected-payload-card {
   margin-bottom: 0.75rem;
+  border-color: rgba(88, 255, 176, 0.22);
 }
 
 .jp-inline-form {
   grid-template-columns: 1fr;
+}
+
+.jp-field-wide {
+  grid-column: 1 / -1;
 }
 
 .jp-workflow-box {
@@ -1487,7 +1513,7 @@ main {
 }
 
 .jp-payload-list {
-  max-height: calc(100vh - 14rem);
+  max-height: calc(100vh - 26rem);
   overflow: auto;
   padding-right: 0.2rem;
 }
@@ -1509,6 +1535,34 @@ main {
 .jp-payload-selected {
   border-color: rgba(179, 107, 255, 0.72) !important;
   background: rgba(179, 107, 255, 0.08) !important;
+}
+
+.jp-payload-open,
+.jp-pill-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid rgba(88, 255, 176, 0.35);
+  border-radius: 999px;
+  color: var(--jp-green);
+  font-size: 0.72rem;
+  font-weight: 850;
+  padding: 0.3rem 0.55rem;
+  white-space: nowrap;
+}
+
+.jp-pill-danger {
+  border-color: rgba(255, 77, 121, 0.42);
+  color: #ffd5df;
+}
+
+.jp-tag-row-compact {
+  margin-top: 0.45rem;
+}
+
+.jp-tag-row-compact .jp-tag {
+  font-size: 0.64rem;
+  padding: 0.18rem 0.42rem;
 }
 
 @media (max-width: 1280px) {
@@ -1540,6 +1594,7 @@ main {
 
   .jp-category-panel {
     order: 0;
+    position: static;
   }
 
   .jp-active-run-panel {

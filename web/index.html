@@ -353,7 +353,7 @@
 
       <!-- Payload library -->
       <div id="payloadTab" class="hidden space-y-4">
-        <section class="jp-page-head">
+        <section class="jp-page-head jp-page-head-compact">
           <div class="min-w-0">
             <div class="jp-kicker">Payload Workbench</div>
             <h1>Payloads</h1>
@@ -371,8 +371,8 @@
           <div class="jp-panel jp-category-panel">
             <div class="jp-panel-head">
               <div>
-                <div class="jp-panel-title">Categories</div>
-                <div class="jp-panel-subtitle">Grouped workflows with descriptions.</div>
+                <div class="jp-panel-title">Payload Library</div>
+                <div class="jp-panel-subtitle">Pick a category, then open a workflow.</div>
               </div>
             </div>
             <label class="jp-field">
@@ -380,15 +380,15 @@
               <input id="payloadSearch" type="search" autocomplete="off" placeholder="Filter payloads">
             </label>
             <div id="payloadCategoryList" class="jp-category-list mt-3"></div>
-          </div>
-          <div id="payloadBrowserPanel" class="jp-panel jp-payload-browser">
-            <div class="jp-panel-head">
-              <div class="min-w-0">
-                <div id="payloadCategoryTitle" class="jp-panel-title">Payloads</div>
-                <div id="payloadCategoryDescription" class="jp-panel-subtitle">Select a category.</div>
+            <div id="payloadBrowserPanel" class="jp-payload-browser mt-3">
+              <div class="jp-panel-head jp-panel-head-tight">
+                <div class="min-w-0">
+                  <div id="payloadCategoryTitle" class="jp-panel-title">Payloads</div>
+                  <div id="payloadCategoryDescription" class="jp-panel-subtitle">Select a category.</div>
+                </div>
               </div>
+              <div id="payloadQuickGrid" class="jp-payload-list"></div>
             </div>
-            <div id="payloadQuickGrid" class="jp-payload-list"></div>
           </div>
 
           <div id="payloadDetailPanel" class="jp-panel jp-active-run-panel jp-payload-detail-panel">
@@ -420,12 +420,12 @@
                 <input id="payloadInlineRaw" type="text" autocomplete="off" placeholder="Optional CLI flags">
               </label>
             </div>
-            <div class="jp-run-card">
+            <div class="jp-run-card hidden">
               <div class="text-[11px] uppercase tracking-[0.16em] text-slate-500">Payload</div>
               <div id="payloadLibraryActive" class="mt-1 text-lg font-semibold text-slate-100">None</div>
               <div id="payloadWorkbenchMeta" class="mt-1 text-xs text-slate-400">Ready</div>
             </div>
-            <div class="mt-3">
+            <div id="payloadActionsBlock" class="mt-3 hidden">
               <div class="jp-mini-title">Actions</div>
               <div id="payloadActionGrid" class="jp-action-grid mt-2"></div>
             </div>

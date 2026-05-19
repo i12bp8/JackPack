@@ -100,6 +100,7 @@
   const payloadWorkbenchLogTail = document.getElementById("payloadWorkbenchLogTail");
   const payloadWorkbenchLogStatus = document.getElementById("payloadWorkbenchLogStatus");
   const payloadWorkbenchLogRefresh = document.getElementById("payloadWorkbenchLogRefresh");
+  const payloadActionsBlock = document.getElementById("payloadActionsBlock");
   const payloadActionGrid = document.getElementById("payloadActionGrid");
   const payloadControlStatus = document.getElementById("payloadControlStatus");
   const payloadSummary = document.getElementById("payloadSummary");
@@ -639,8 +640,11 @@
     workflow: { path: "", networks: [], selectedBssids: {}, portals: [], status: "" },
     selectedCategory: "",
     query: "",
+    schemaCache: {},
   };
   let networkState = { interfaces: [], selectedNetwork: null };
+  let networkStatusLoadedAt = 0;
+  let networkStatusPromise = null;
   let textSessionState = { active: false, sessionId: "", defaultValue: "" };
   let term = null;
   let fitAddon = null;
@@ -784,8 +788,11 @@
           ? `Ready to launch ${payloadLabel(payloadState.selectedPath)}.`
           : "Choose a payload to configure and run.";
     }
+    if (payloadActionsBlock) {
+      payloadActionsBlock.classList.toggle("hidden", !actions.length);
+    }
     if (!actions.length) {
-      payloadActionGrid.innerHTML = `<div class="jp-empty-form">Legacy LCD keypad controls are hidden in JackPack. Use the workflow setup above, watch Live Output, and stop the run from this console.</div>`;
+      payloadActionGrid.innerHTML = "";
       return;
     }
     payloadActionGrid.innerHTML = actions
@@ -1468,18 +1475,34 @@
     } catch {}
   }
 
-  async function loadNetworkStatus() {
-    setNetworkStatus("Loading...");
-    try {
-      const res = await apiFetch(getApiUrl("/api/network/status"), { cache: "no-store" });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "network_failed");
-      networkState.interfaces = Array.isArray(data.interfaces) ? data.interfaces : [];
+  async function loadNetworkStatus(options = {}) {
+    const force = !!options.force;
+    const silent = !!options.silent;
+    const fresh = Date.now() - networkStatusLoadedAt < 15000;
+    if (!force && fresh && networkState.interfaces.length) {
       renderNetworkInterfaces();
-      setNetworkStatus(data.nmcli ? "Ready" : "nmcli missing");
-    } catch (e) {
-      setNetworkStatus("Unavailable");
+      return networkState.interfaces;
     }
+    if (networkStatusPromise) return networkStatusPromise;
+    if (!silent) setNetworkStatus("Loading...");
+    networkStatusPromise = (async () => {
+      try {
+        const res = await apiFetch(getApiUrl("/api/network/status"), { cache: "no-store" });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "network_failed");
+        networkState.interfaces = Array.isArray(data.interfaces) ? data.interfaces : [];
+        networkStatusLoadedAt = Date.now();
+        renderNetworkInterfaces();
+        if (!silent) setNetworkStatus(data.nmcli ? "Ready" : "nmcli missing");
+        return networkState.interfaces;
+      } catch (e) {
+        if (!silent) setNetworkStatus("Unavailable");
+        return networkState.interfaces;
+      } finally {
+        networkStatusPromise = null;
+      }
+    })();
+    return networkStatusPromise;
   }
 
   async function scanNetworks() {
@@ -1534,9 +1557,10 @@
       if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "connect_failed");
       if (data.status && Array.isArray(data.status.interfaces)) {
         networkState.interfaces = data.status.interfaces;
+        networkStatusLoadedAt = Date.now();
         renderNetworkInterfaces();
       } else {
-        await loadNetworkStatus();
+        await loadNetworkStatus({ force: true });
       }
       if (networkPassword) networkPassword.value = "";
       setNetworkStatus("Connected");
@@ -1562,9 +1586,10 @@
       if (!res.ok || !data.ok) throw new Error(data && data.error ? data.error : "disconnect_failed");
       if (data.status && Array.isArray(data.status.interfaces)) {
         networkState.interfaces = data.status.interfaces;
+        networkStatusLoadedAt = Date.now();
         renderNetworkInterfaces();
       } else {
-        await loadNetworkStatus();
+        await loadNetworkStatus({ force: true });
       }
       setNetworkStatus("Disconnected");
     } catch (e) {
@@ -2517,6 +2542,7 @@
   async function loadPayloads() {
     setPayloadStatus("Loading...");
     try {
+      payloadState.schemaCache = {};
       const url = getApiUrl("/api/payloads/list");
       const res = await apiFetch(url, { cache: "no-store" });
       const data = await res.json();
@@ -2532,19 +2558,13 @@
       if (!payloadState.selectedCategory && payloadState.categories.length) {
         payloadState.selectedCategory = payloadState.categories[0].id || "";
       }
-    renderPayloadSidebar();
-    renderPayloadCategories();
-    renderPayloadQuickGrid();
-    if (!payloadState.selectedPath) {
-      const firstCat = payloadState.categories.find((cat) => cat.id === payloadState.selectedCategory) || payloadState.categories[0];
-      const firstPayload = firstCat && Array.isArray(firstCat.items) ? firstCat.items[0] : null;
-      if (firstPayload && firstPayload.path) {
-        selectPayload(firstPayload.path).catch(() => {});
-      } else {
+      renderPayloadSidebar();
+      renderPayloadCategories();
+      renderPayloadQuickGrid();
+      if (!payloadState.selectedPath) {
         renderPayloadDetail(null);
       }
-    }
-    setPayloadStatus("Ready");
+      setPayloadStatus("Ready");
     } catch (e) {
       setPayloadStatus("Failed to load");
       if (payloadSidebar)
@@ -2600,11 +2620,6 @@
     renderPayloadSidebar();
     renderPayloadCategories();
     renderPayloadQuickGrid();
-    const selectedCat = cats.find((cat) => cat.id === payloadState.selectedCategory) || cats[0] || null;
-    const firstPayload = selectedCat && Array.isArray(selectedCat.items) ? selectedCat.items[0] : null;
-    if (firstPayload && firstPayload.path) {
-      selectPayload(firstPayload.path).catch(() => {});
-    }
     scrollIntoWorkbench(payloadBrowserPanel);
   }
 
@@ -2621,11 +2636,8 @@
         const selected = id === payloadState.selectedCategory;
         const count = Array.isArray(cat.items) ? cat.items.length : 0;
         return `<button type="button" data-payload-category="${encodeData(id)}" class="jp-category-card ${selected ? "jp-category-active" : ""}">
-          <div class="jp-category-top">
-            <div class="jp-category-title">${escapeHtml(cat.label || id || "Category")}</div>
-            <div class="jp-category-count">${count}</div>
-          </div>
-          <div class="jp-category-meta">${escapeHtml(cat.description || "Payload workflows")}</div>
+          <span class="jp-category-title">${escapeHtml(cat.label || id || "Category")}</span>
+          <span class="jp-category-count">${count}</span>
         </button>`;
       })
       .join("");
@@ -2693,8 +2705,8 @@
         const isActive = payloadState.activePath === itemPath;
         const isSelected = payloadState.selectedPath === itemPath;
         const action = isActive
-          ? '<button type="button" data-stop="1" class="jp-btn jp-btn-danger"><i class="fa-solid fa-stop"></i> Stop</button>'
-          : `<button type="button" data-select-payload="${encoded}" class="jp-btn ${isSelected ? "jp-btn-primary" : "jp-btn-muted"}"><i class="fa-solid ${isSelected ? "fa-circle-dot" : "fa-arrow-right"}"></i> ${isSelected ? "Selected" : "Open"}</button>`;
+          ? '<span class="jp-pill-danger"><i class="fa-solid fa-stop"></i> Running</span>'
+          : `<span class="jp-payload-open">${isSelected ? "Selected" : "Open"}</span>`;
         return `
           <div class="jp-payload-card ${isSelected ? "jp-payload-selected" : ""}" data-select-payload="${encoded}">
             <div class="jp-payload-row">
@@ -2702,7 +2714,7 @@
                 <div class="jp-payload-name">${escapeHtml(payloadLabel(itemPath))}</div>
                 <div class="jp-payload-path">${escapeHtml(itemPath)}</div>
                 <div class="jp-payload-desc">${escapeHtml(description)}</div>
-                <div class="jp-tag-row">${tags.slice(0, 5).map((tag, idx) => `<span class="jp-tag ${idx === 0 ? "jp-tag-purple" : ""}">${escapeHtml(String(tag))}</span>`).join("")}</div>
+                <div class="jp-tag-row jp-tag-row-compact">${tags.slice(0, 3).map((tag, idx) => `<span class="jp-tag ${idx === 0 ? "jp-tag-purple" : ""}">${escapeHtml(String(tag))}</span>`).join("")}</div>
               </div>
               ${action}
             </div>
@@ -2748,6 +2760,13 @@
     const required = field.required ? "required" : "";
     const envAttr = field.env ? `data-env="${escapeHtml(field.env)}"` : "";
     const def = field.default === undefined || field.default === null ? "" : String(field.default);
+    if (field.type === "textarea") {
+      return `<label class="jp-field jp-field-wide">
+        <span>${label}</span>
+        <textarea data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} ${required} rows="${escapeHtml(field.rows || 4)}">${escapeHtml(def)}</textarea>
+        ${help}
+      </label>`;
+    }
     if (field.type === "checkbox") {
       const checked = field.default === true ? "checked" : "";
       return `<label class="jp-check-row">
@@ -2758,8 +2777,10 @@
     if (field.type === "interface") {
       const ifaceType = String(field.iface_type || "").toLowerCase();
       const needsMonitor = !!field.require_monitor;
+      const allowControl = field.allow_control_iface === true;
       const interfaces = (networkState.interfaces || []).filter((item) => {
         if (!(item.present || item.recommended || item.protected)) return false;
+        if (!allowControl && (item.protected || item.role === "control_ap")) return false;
         if (ifaceType === "wifi") return !!item.wireless;
         if (ifaceType === "eth" || ifaceType === "wired") return !item.wireless;
         if (needsMonitor) return !!item.wireless;
@@ -2806,9 +2827,11 @@
         ${help}
       </label>`;
     }
+    const minAttr = field.min === undefined || field.min === null ? "" : `min="${escapeHtml(field.min)}"`;
+    const maxAttr = field.max === undefined || field.max === null ? "" : `max="${escapeHtml(field.max)}"`;
     return `<label class="jp-field">
       <span>${label}</span>
-      <input type="${field.type === "number" ? "number" : "text"}" data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} value="${escapeHtml(def)}" ${required}>
+      <input type="${field.type === "number" ? "number" : "text"}" data-payload-field="${name}" data-arg="${escapeHtml(field.arg || "")}" ${envAttr} value="${escapeHtml(def)}" ${required} ${minAttr} ${maxAttr}>
       ${help}
     </label>`;
   }
@@ -2891,14 +2914,7 @@
       return true;
     }
     if (workflow.type === "captive_portal") {
-      payloadInlineForm.insertAdjacentHTML(
-        "beforeend",
-        `${renderWorkflowAuthorization(workflow)}
-        <div class="jp-workflow-box">
-          <div class="jp-mini-title">Portal Runtime</div>
-          <div class="jp-panel-subtitle">The selected template and SSID are written into the payload config before launch.</div>
-        </div>`,
-      );
+      payloadInlineForm.insertAdjacentHTML("beforeend", renderWorkflowAuthorization(workflow));
       if (!payloadState.workflow.portals.length) {
         loadWorkflowPortals().catch(() => {});
       }
@@ -2910,6 +2926,14 @@
 
   function workflowFieldEnv(formEl = payloadInlineForm) {
     return buildPayloadArgsFromForm(formEl, null).env || {};
+  }
+
+  function selectedIfaceIsControl(iface) {
+    const name = String(iface || "").trim();
+    if (!name) return false;
+    return (networkState.interfaces || []).some((item) => (
+      String(item.name || "") === name && (item.protected || item.role === "control_ap")
+    ));
   }
 
   async function loadWorkflowPortals() {
@@ -2982,6 +3006,10 @@
     const authorized = !workflow.requires_authorization || !!payloadInlineForm?.querySelector("[data-workflow-authorized]")?.checked;
     if (!authorized) {
       return { ok: false, error: "Confirm this is an authorized test first." };
+    }
+    const selectedIface = env.JACKPACK_SELECTED_IFACE || env.JACKPACK_ATTACK_IFACE || "";
+    if (selectedIfaceIsControl(selectedIface)) {
+      return { ok: false, error: `${selectedIface} is the JackPack control AP. Choose the USB WiFi adapter.` };
     }
     if (workflow.type === "wifi_ap_targets") {
       const targets = selectedWifiTargetsFromDom();
@@ -3093,23 +3121,30 @@
     if (payloadDetailTitle) payloadDetailTitle.textContent = payloadLabel(cleanPath);
     if (payloadDetailPath) payloadDetailPath.textContent = cleanPath;
     if (payloadInlineForm) payloadInlineForm.innerHTML = '<div class="jp-empty-form">Loading setup...</div>';
+    if (payloadInlineRawWrap) payloadInlineRawWrap.classList.add("hidden");
     renderPayloadQuickGrid();
     if (opts.scroll) scrollIntoWorkbench(payloadDetailPanel);
     try {
-      const res = await apiFetch(getApiUrl("/api/payloads/schema", { path: cleanPath }), { cache: "no-store" });
-      const schema = await res.json();
-      if (!res.ok) throw new Error(schema && schema.error ? schema.error : "schema_failed");
+      let schema = payloadState.schemaCache[cleanPath];
+      if (!schema) {
+        const res = await apiFetch(getApiUrl("/api/payloads/schema", { path: cleanPath }), { cache: "no-store" });
+        schema = await res.json();
+        if (!res.ok) throw new Error(schema && schema.error ? schema.error : "schema_failed");
+        payloadState.schemaCache[cleanPath] = schema;
+      }
       const schemaFields = Array.isArray(schema.fields) ? schema.fields : [];
       const workflowFields = Array.isArray(schema.workflow?.fields) ? schema.workflow.fields : [];
       const needsInterfaces = [...schemaFields, ...workflowFields].some((field) => field && field.type === "interface");
-      if (needsInterfaces && !networkState.interfaces.length) {
-        await loadNetworkStatus();
-      }
       payloadState.selectedSchema = schema;
       if (payloadState.activePath === cleanPath) {
         payloadState.activeSchema = schema;
       }
       renderPayloadDetail(schema);
+      if (needsInterfaces && !networkState.interfaces.length) {
+        loadNetworkStatus({ silent: true }).then(() => {
+          if (payloadState.selectedPath === cleanPath) renderPayloadDetail(schema);
+        });
+      }
     } catch (e) {
       payloadState.selectedSchema = { path: cleanPath, name: payloadLabel(cleanPath), fields: [], raw_args: true, actions: [], meta: {} };
       renderPayloadDetail(payloadState.selectedSchema);
@@ -3522,7 +3557,7 @@
   if (navPayloads)
     navPayloads.addEventListener("click", () => {
       setActiveTab("payloads");
-      loadPayloads();
+      if (!payloadState.categories.length) loadPayloads();
     });
   if (navTerminal)
     navTerminal.addEventListener("click", () => {
@@ -3688,7 +3723,7 @@
   if (activePayloadStop)
     activePayloadStop.addEventListener("click", () => stopPayload());
   if (networkRefresh)
-    networkRefresh.addEventListener("click", () => loadNetworkStatus());
+    networkRefresh.addEventListener("click", () => loadNetworkStatus({ force: true }));
   if (networkScan)
     networkScan.addEventListener("click", () => scanNetworks());
   if (networkDisconnect)

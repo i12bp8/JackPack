@@ -139,6 +139,7 @@ def _workflow_schema(rel_path: str) -> dict | None:
                     "required": True,
                     "default": _env_first("JACKPACK_ATTACK_IFACE", "PACKJACK_ATTACK_IFACE", default="wlan1"),
                     "help": "External USB WiFi adapter used for scanning and payload traffic.",
+                    "allow_control_iface": False,
                 },
                 {
                     "name": "mode",
@@ -180,6 +181,7 @@ def _workflow_schema(rel_path: str) -> dict | None:
                     "required": True,
                     "default": _env_first("JACKPACK_ATTACK_IFACE", "PACKJACK_ATTACK_IFACE", default="wlan1"),
                     "help": "External USB WiFi adapter used to host the portal AP.",
+                    "allow_control_iface": False,
                 },
                 {
                     "name": "ssid",
@@ -197,6 +199,15 @@ def _workflow_schema(rel_path: str) -> dict | None:
                     "type": "portal_select",
                     "default": "",
                     "help": "Use Built-in or a template from config/portal_sites.",
+                },
+                {
+                    "name": "whitelist",
+                    "env": "JACKPACK_CAPTIVE_PORTAL_WHITELIST",
+                    "label": "Allowed MACs",
+                    "type": "textarea",
+                    "default": "",
+                    "rows": 3,
+                    "help": "Optional comma or newline separated MAC addresses that should bypass the portal.",
                 },
             ],
             "autostart_env": "JACKPACK_CAPTIVE_PORTAL_AUTOSTART",
@@ -2435,10 +2446,22 @@ class JackPackHandler(SimpleHTTPRequestHandler):
                     continue
                 rel_path = os.path.join(rel_dir, name) if rel_dir != "." else name
                 full_path = Path(root) / name
+                clean_rel_path = rel_path.replace("\\", "/")
+                workflow = _workflow_schema(clean_rel_path)
+                meta = _payload_meta(full_path)
+                if workflow:
+                    meta.update({
+                        "headless": "native",
+                        "needs_display": False,
+                        "uses_wifi": True,
+                        "uses_external_wifi": True,
+                        "tags": ["web-native", "wifi", "wlan1"],
+                        "description": workflow.get("summary", ""),
+                    })
                 categories.setdefault(category, []).append({
                     "name": os.path.splitext(name)[0],
-                    "path": rel_path.replace("\\", "/"),
-                    "meta": _payload_meta(full_path),
+                    "path": clean_rel_path,
+                    "meta": meta,
                 })
 
         order = [
@@ -2502,14 +2525,29 @@ class JackPackHandler(SimpleHTTPRequestHandler):
             rel_path = str(target.resolve().relative_to(payload_root)).replace("\\", "/")
         except Exception:
             rel_path = raw
+        workflow = _workflow_schema(rel_path)
+        if workflow:
+            _json_response(self, {
+                "mode": "workflow",
+                "fields": [],
+                "actions": [],
+                "raw_args": False,
+                "meta": {
+                    "headless": "native",
+                    "needs_display": False,
+                    "uses_wifi": True,
+                    "uses_external_wifi": True,
+                    "tags": ["web-native", "wifi", "wlan1"],
+                    "description": workflow.get("summary", ""),
+                },
+                "path": rel_path,
+                "name": workflow.get("title") or Path(rel_path).stem.replace("_", " ").title(),
+                "workflow": workflow,
+            })
+            return
         schema = _payload_form_schema(target)
         schema["path"] = rel_path
         schema["name"] = Path(rel_path).stem.replace("_", " ").title()
-        workflow = _workflow_schema(rel_path)
-        if workflow:
-            schema["mode"] = "workflow"
-            schema["workflow"] = workflow
-            schema["actions"] = []
         _json_response(self, schema)
 
     def _handle_payloads_workflow_portals(self) -> None:
@@ -2561,6 +2599,17 @@ class JackPackHandler(SimpleHTTPRequestHandler):
                 for key, value in (raw_env.items() if isinstance(raw_env, dict) else [])
                 if re.match(r"^[A-Z0-9_]{1,64}$", str(key))
             }
+            workflow = _workflow_schema(rel_path)
+            if workflow:
+                selected_iface = str(extra_env.get("JACKPACK_SELECTED_IFACE") or extra_env.get("JACKPACK_ATTACK_IFACE") or "").strip()
+                control_iface = _env_first("JACKPACK_AP_IFACE", "PACKJACK_AP_IFACE", default="wlan0")
+                if selected_iface and (selected_iface == control_iface or _iface_role(selected_iface) == "control_ap"):
+                    _json_response(
+                        self,
+                        {"error": f"{selected_iface} is the JackPack control AP; choose the USB WiFi adapter"},
+                        status=HTTPStatus.BAD_REQUEST,
+                    )
+                    return
             try:
                 status = payload_runner.start(rel_path, args, extra_env=extra_env)
                 _json_response(self, {"ok": True, **status})

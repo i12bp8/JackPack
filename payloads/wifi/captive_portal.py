@@ -32,12 +32,14 @@ import signal
 import threading
 import subprocess
 import re
+import shlex
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import parse_qs, unquote_plus
 from socketserver import ThreadingMixIn
 
-sys.path.append(os.path.abspath(os.path.join(__file__, "..", "..", "..")))
+ROOT_DIR = os.path.abspath(os.path.join(__file__, "..", "..", ".."))
+sys.path.append(ROOT_DIR)
 
 import RPi.GPIO as GPIO
 from packjack.compat import LCD_1in44, LCD_Config
@@ -63,8 +65,8 @@ font = scaled_font()
 # ---------------------------------------------------------------------------
 # Paths & constants
 # ---------------------------------------------------------------------------
-PORTAL_DIR = "/root/JackPack/config/portal_sites"
-LOOT_DIR = "/root/Raspyjack/loot/Portal"
+PORTAL_DIR = os.environ.get("JACKPACK_PORTAL_SITES_DIR", os.path.join(ROOT_DIR, "config", "portal_sites"))
+LOOT_DIR = os.environ.get("JACKPACK_PORTAL_LOOT_DIR", os.path.join(ROOT_DIR, "loot", "Portal"))
 CONFIG_PATH = os.path.join(LOOT_DIR, "portal_config.json")
 WHITELIST_PATH = os.path.join(LOOT_DIR, "whitelist.json")
 CREDS_LOG = os.path.join(LOOT_DIR, "creds.log")
@@ -73,6 +75,7 @@ DNSMASQ_CONF = "/tmp/rj_portal_dnsmasq.conf"
 GATEWAY_IP = "10.0.77.1"
 DHCP_RANGE = "10.0.77.10,10.0.77.250,12h"
 HTTP_PORT = 80
+IPTABLES_COMMENT = "JACKPACK_CAPTIVE_PORTAL"
 ROW_H = 12
 ROWS_VISIBLE = 7
 os.makedirs(LOOT_DIR, exist_ok=True)
@@ -370,6 +373,14 @@ def _run(cmd):
     subprocess.run(cmd, capture_output=True, timeout=5)
 
 
+def _control_iface():
+    return os.environ.get("JACKPACK_AP_IFACE") or os.environ.get("PACKJACK_AP_IFACE") or "wlan0"
+
+
+def _is_control_iface(iface):
+    return bool(iface) and iface == _control_iface()
+
+
 def _set_managed_mode(iface):
     """Restore managed mode on interface."""
     for cmd in (
@@ -394,28 +405,84 @@ def _write_dnsmasq_conf(iface):
         f.write(
             f"interface={iface}\ndhcp-range={DHCP_RANGE}\n"
             f"dhcp-option=3,{GATEWAY_IP}\ndhcp-option=6,{GATEWAY_IP}\n"
-            f"address=/#/{GATEWAY_IP}\nno-resolv\nlog-queries\nlog-dhcp\n"
+            f"address=/#/{GATEWAY_IP}\nbind-interfaces\nno-resolv\n"
+            f"log-queries\nlog-dhcp\n"
         )
 
 
+def _iptables_rule_exists(chain, args):
+    result = subprocess.run(
+        ["sudo", "iptables", "-t", "nat", "-C", chain, *args],
+        capture_output=True, timeout=5,
+    )
+    return result.returncode == 0
+
+
+def _iptables_ensure(chain, args, insert=False):
+    if _iptables_rule_exists(chain, args):
+        return
+    op = "-I" if insert else "-A"
+    _run(["sudo", "iptables", "-t", "nat", op, chain, *args])
+
+
+def _delete_commented_nat_rules():
+    try:
+        result = subprocess.run(
+            ["sudo", "iptables", "-t", "nat", "-S"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except Exception:
+        return
+    for line in result.stdout.splitlines():
+        if IPTABLES_COMMENT not in line:
+            continue
+        try:
+            parts = shlex.split(line)
+        except ValueError:
+            continue
+        if not parts or parts[0] != "-A":
+            continue
+        parts[0] = "-D"
+        _run(["sudo", "iptables", "-t", "nat", *parts])
+
+
+def _cleanup_stale_portal_processes():
+    patterns = [
+        f"hostapd {HOSTAPD_CONF}",
+        f"dnsmasq -C {DNSMASQ_CONF}",
+    ]
+    for pattern in patterns:
+        _run(["sudo", "pkill", "-f", pattern])
+
+
 def _iptables_whitelist_add(iface, mac):
-    _run(["sudo", "iptables", "-t", "nat", "-I", "PREROUTING",
-          "-i", iface, "-m", "mac", "--mac-source", mac, "-j", "ACCEPT"])
+    args = [
+        "-i", iface, "-m", "mac", "--mac-source", mac,
+        "-m", "comment", "--comment", IPTABLES_COMMENT,
+        "-j", "ACCEPT",
+    ]
+    _iptables_ensure("PREROUTING", args, insert=True)
 
 
 def _setup_iptables(iface):
     """Redirect HTTP (80), HTTPS (443), and DNS (53) to the portal."""
+    _delete_commented_nat_rules()
     for dport, proto in [("80", "tcp"), ("443", "tcp"), ("53", "udp")]:
         if proto == "udp":
             dest = f"{GATEWAY_IP}:53"
         else:
             dest = f"{GATEWAY_IP}:{HTTP_PORT}"
-        _run(["sudo", "iptables", "-t", "nat", "-A", "PREROUTING",
-              "-i", iface, "-p", proto, "--dport", dport,
-              "-j", "DNAT", "--to-destination", dest])
+        _iptables_ensure("PREROUTING", [
+            "-i", iface, "-p", proto, "--dport", dport,
+            "-m", "comment", "--comment", IPTABLES_COMMENT,
+            "-j", "DNAT", "--to-destination", dest,
+        ])
     # MASQUERADE for captive portal detection on modern devices
-    _run(["sudo", "iptables", "-t", "nat", "-A", "POSTROUTING",
-          "-j", "MASQUERADE"])
+    _iptables_ensure("POSTROUTING", [
+        "-s", "10.0.77.0/24",
+        "-m", "comment", "--comment", IPTABLES_COMMENT,
+        "-j", "MASQUERADE",
+    ])
     # Enable IP forwarding
     _run(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=1"])
     # Apply whitelist entries
@@ -424,8 +491,7 @@ def _setup_iptables(iface):
 
 
 def _teardown_iptables():
-    _run(["sudo", "iptables", "-t", "nat", "-F"])
-    _run(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=0"])
+    _delete_commented_nat_rules()
 
 
 # ---------------------------------------------------------------------------
@@ -454,6 +520,11 @@ def _start_portal():
     if not iface:
         with lock:
             status_msg = "No WiFi interface"
+        return
+    if _is_control_iface(iface):
+        with lock:
+            status_msg = f"Refusing control AP {iface}"
+        print(f"[JackPack] Refusing to run captive portal on control AP {iface}", flush=True)
         return
 
     cfg = _load_config()
@@ -492,17 +563,15 @@ def _start_portal():
     with lock:
         status_msg = "Configuring..."
 
+    _teardown_iptables()
+    _cleanup_stale_portal_processes()
+
     # Prepare interface
     _set_managed_mode(iface)
     time.sleep(0.3)
     _run(["sudo", "ip", "addr", "flush", "dev", iface])
     _run(["sudo", "ip", "addr", "add", f"{GATEWAY_IP}/24", "dev", iface])
     _run(["sudo", "ip", "link", "set", iface, "up"])
-
-    # Kill stale processes
-    for proc_name in ("hostapd", "dnsmasq"):
-        _run(["sudo", "killall", proc_name])
-    time.sleep(0.3)
 
     # Start hostapd
     _write_hostapd_conf(iface, ssid_str)
@@ -613,9 +682,7 @@ def _stop_portal():
             _dnsmasq_proc.kill()
     _dnsmasq_proc = None
 
-    # Kill any strays
-    for proc_name in ("hostapd", "dnsmasq"):
-        _run(["sudo", "killall", proc_name])
+    _cleanup_stale_portal_processes()
 
     _teardown_iptables()
 
@@ -913,6 +980,10 @@ def main():
     if not _iface:
         GPIO.cleanup()
         return 1
+    if _is_control_iface(_iface):
+        print(f"[JackPack] Refusing captive portal on control AP {_iface}", flush=True)
+        GPIO.cleanup()
+        return 1
 
     # Splash screen
     img, d = _new_frame()
@@ -932,6 +1003,10 @@ def main():
         if "JACKPACK_CAPTIVE_PORTAL_TEMPLATE" in os.environ:
             cfg["selected_portal"] = os.environ.get("JACKPACK_CAPTIVE_PORTAL_TEMPLATE") or ""
         _save_config(cfg)
+        whitelist_raw = os.environ.get("JACKPACK_CAPTIVE_PORTAL_WHITELIST", "")
+        if whitelist_raw.strip():
+            macs = re.findall(r"(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}", whitelist_raw)
+            _save_whitelist(sorted({mac.lower() for mac in macs}))
         with lock:
             view = VIEW_STATUS
             status_msg = "Autostart requested"
