@@ -156,6 +156,7 @@
   const configWsPort = document.getElementById("configWsPort");
   const updateStatus = document.getElementById("updateStatus");
   const updateOutput = document.getElementById("updateOutput");
+  const updateNetworkHint = document.getElementById("updateNetworkHint");
   const updatePull = document.getElementById("updatePull");
   const updateApply = document.getElementById("updateApply");
   const updateRestart = document.getElementById("updateRestart");
@@ -785,8 +786,8 @@
       payloadControlStatus.textContent = running
         ? `Runtime controls for ${payloadLabel(payloadState.activePath)}`
         : payloadState.selectedPath
-          ? `Ready to launch ${payloadLabel(payloadState.selectedPath)}.`
-          : "Choose a payload to configure and run.";
+          ? `${payloadLabel(payloadState.selectedPath)} selected.`
+          : "Choose a payload.";
     }
     if (payloadActionsBlock) {
       payloadActionsBlock.classList.toggle("hidden", !actions.length);
@@ -912,13 +913,6 @@
   function setNavActive(btn, active) {
     if (!btn) return;
     btn.classList.toggle("nav-active", active);
-    btn.classList.toggle("bg-emerald-500/10", active);
-    btn.classList.toggle("text-emerald-300", active);
-    btn.classList.toggle("border-emerald-400/30", active);
-    btn.classList.toggle("shadow-[0_0_16px_rgba(16,185,129,0.15)]", active);
-    btn.classList.toggle("bg-slate-800/40", !active);
-    btn.classList.toggle("text-slate-300", !active);
-    btn.classList.toggle("border-slate-400/20", !active);
   }
 
   function setActiveTab(tab) {
@@ -1356,23 +1350,23 @@
       const wired = ifaceByRole(ifaces, "wired_target", (data.wired && data.wired.iface) || "eth0");
 
       if (headlessMode) {
-        headlessMode.textContent = data.headless ? "Headless runtime active" : "Classic runtime";
+        headlessMode.textContent = data.headless ? "Headless" : "Classic";
       }
       if (headlessAp) {
-        headlessAp.textContent = `${ap.ssid || "JackPack"} on ${ap.iface || "wlan0"}${ap.present ? "" : " missing"}`;
+        headlessAp.textContent = `${ap.ssid || "JackPack"} · ${ap.iface || "wlan0"}${ap.present ? "" : " missing"}`;
       }
       if (headlessAttack) {
-        headlessAttack.textContent = `${attack.iface || "wlan1"} ${attack.present ? "ready" : "not detected"}`;
+        headlessAttack.textContent = `${attack.iface || "wlan1"} ${attack.present ? "ready" : "missing"}`;
       }
       if (controlApValue) controlApValue.textContent = `${ap.iface || "wlan0"} · ${ap.ssid || "JackPack"}`;
       if (controlApMeta) {
         const web = data.web || {};
-        controlApMeta.textContent = ap.present ? `Open ${web.url || "http://jackpack.local:8080"}` : "Interface not detected";
+        controlApMeta.textContent = ap.present ? (web.url || "http://jackpack.local:8080") : "Missing";
       }
       if (attackWifiValue) attackWifiValue.textContent = attack.iface || "wlan1";
-      if (attackWifiMeta) attackWifiMeta.textContent = attack.present ? "External adapter detected" : "Plug in a monitor-mode USB adapter";
+      if (attackWifiMeta) attackWifiMeta.textContent = attack.present ? "Detected" : "Plug in USB adapter";
       if (wiredValue) wiredValue.textContent = wired ? `${wired.name} · ${wired.ipv4 || "-"}` : ((data.wired && data.wired.iface) || "eth0");
-      if (wiredMeta) wiredMeta.textContent = wired ? "Built-in Ethernet online" : "No wired address";
+      if (wiredMeta) wiredMeta.textContent = wired ? "Online" : "No address";
       if (data.payload) setActivePayloadView(data.payload);
     } catch (e) {
       if (headlessMode) headlessMode.textContent = "Status unavailable";
@@ -1778,7 +1772,35 @@
     }
   }
 
+  function hasInternetCandidate() {
+    return (networkState.interfaces || []).some((item) => {
+      const role = String(item.role || "");
+      const state = String(item.state || "").toLowerCase();
+      const ip = String(item.ipv4 || "");
+      if (item.protected || role === "control_ap") return false;
+      if (!ip || ip === "-") return false;
+      return state.includes("connected") || role === "wired_target" || role === "attack_wifi";
+    });
+  }
+
+  async function ensureInternetForUpdate() {
+    const ifaces = await loadNetworkStatus({ silent: true });
+    const ok = hasInternetCandidate(ifaces);
+    if (updateNetworkHint) updateNetworkHint.classList.toggle("hidden", ok);
+    if (ok) return true;
+    setUpdateStatus("Connect first");
+    if (updateOutput) {
+      updateOutput.textContent = "No internet link detected on wlan1 or eth0.\n\nOpen Connect, join WiFi with wlan1 or plug Ethernet, then run update again.";
+    }
+    return false;
+  }
+
   async function startUpdate(applyInstaller = false) {
+    if (!(await ensureInternetForUpdate())) {
+      setActiveTab("network");
+      await loadNetworkStatus({ force: true });
+      return;
+    }
     setUpdateStatus("Starting...");
     try {
       const res = await apiFetch(getApiUrl("/api/system/update"), {
@@ -2701,7 +2723,7 @@
         const encoded = encodeData(itemPath);
         const meta = item.meta || {};
         const tags = Array.isArray(meta.tags) && meta.tags.length ? meta.tags : [String(item.category || "payload")];
-        const description = meta.description || "No description yet. Open Payload Studio to add metadata or a module docstring.";
+        const description = meta.description || "No description.";
         const isActive = payloadState.activePath === itemPath;
         const isSelected = payloadState.selectedPath === itemPath;
         const action = isActive
@@ -3060,7 +3082,7 @@
       const workflowSummary = schema?.workflow?.summary || "";
       payloadDetailDescription.textContent = selected
         ? (workflowSummary || meta.description || "This payload does not describe itself yet. Setup and inferred controls are shown below.")
-        : "Payload setup will appear here with web-native fields whenever JackPack can infer them.";
+        : "Select a payload.";
     }
     if (payloadDetailTags) {
       payloadDetailTags.innerHTML = selected
@@ -3083,7 +3105,7 @@
       const fieldCount = Array.isArray((hasWorkflow ? schema?.workflow?.fields : schema?.fields)) ? (hasWorkflow ? schema.workflow.fields.length : schema.fields.length) : 0;
       payloadInlineStatus.textContent = selected
         ? hasWorkflow
-          ? (payloadState.workflow.status || schema?.workflow?.summary || "Configure this workflow, then launch.")
+          ? (payloadState.workflow.status || schema?.workflow?.summary || "Configure, then launch.")
           : fieldCount
             ? `${fieldCount} setup field${fieldCount === 1 ? "" : "s"} ready.`
             : "Launches with defaults."
@@ -3146,7 +3168,7 @@
         });
       }
     } catch (e) {
-      payloadState.selectedSchema = { path: cleanPath, name: payloadLabel(cleanPath), fields: [], raw_args: true, actions: [], meta: {} };
+      payloadState.selectedSchema = { path: cleanPath, name: payloadLabel(cleanPath), fields: [], raw_args: true, actions: [], meta: { description: "No setup metadata yet." } };
       renderPayloadDetail(payloadState.selectedSchema);
       if (payloadInlineStatus) payloadInlineStatus.textContent = e && e.message ? e.message : "Setup unavailable";
     }
@@ -3540,6 +3562,23 @@
     });
   });
   if (logoutBtn) logoutBtn.addEventListener("click", logoutUser);
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-jp-tab]");
+    if (!btn) return;
+    const tab = btn.getAttribute("data-jp-tab");
+    if (!tab) return;
+    setActiveTab(tab);
+    if (tab === "network") loadNetworkStatus({ force: true });
+    if (tab === "payloads" && !payloadState.categories.length) loadPayloads();
+    if (tab === "settings") {
+      loadRuntimeConfig();
+      loadUpdateStatus();
+      loadDiagnostics();
+      loadDiscordWebhook();
+      loadWigleSettings();
+      loadTailscaleSettings();
+    }
+  });
   window.addEventListener("resize", () => {
     if (shellOpen) sendShellResize();
   });

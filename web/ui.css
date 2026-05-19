@@ -9,6 +9,310 @@
   --rj-parity-glow: 0 0 20px rgba(16, 185, 129, 0.12);
 }
 
+/* JackPack UX reset: sober OLED console, minimal hierarchy. */
+:root {
+  --jp-bg: #000;
+  --jp-surface: #05060a;
+  --jp-surface-2: #090b12;
+  --jp-line: #202330;
+  --jp-line-soft: #141720;
+  --jp-text: #f7f8ff;
+  --jp-muted: #8d93a3;
+  --jp-green: #55ffad;
+  --jp-purple: #b56cff;
+  --jp-red: #ff5577;
+}
+
+body {
+  background: var(--jp-bg) !important;
+  color: var(--jp-text) !important;
+}
+
+#sidebar {
+  width: 15.5rem;
+  background: #020307 !important;
+  border-color: var(--jp-line) !important;
+  backdrop-filter: none !important;
+}
+
+#sidebar .border-b,
+#sidebar .border-t {
+  border-color: var(--jp-line-soft) !important;
+}
+
+.jp-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 2.8rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: #d7dbea;
+  font-size: 0.9rem;
+  font-weight: 800;
+  padding: 0.68rem 0.78rem;
+  text-align: left;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.jp-nav-item i {
+  width: 1rem;
+  color: var(--jp-muted);
+  text-align: center;
+}
+
+.jp-nav-item:hover {
+  background: #090b12;
+  border-color: var(--jp-line);
+  color: #fff;
+}
+
+.jp-nav-item.nav-active {
+  background: #07120d !important;
+  border-color: rgba(85, 255, 173, 0.36) !important;
+  color: var(--jp-green) !important;
+  box-shadow: none !important;
+}
+
+.jp-nav-item.nav-active i {
+  color: var(--jp-green);
+}
+
+.jp-nav-secondary {
+  min-height: 2.35rem;
+  color: var(--jp-muted);
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+main {
+  max-width: 1360px;
+}
+
+main > .flex.items-center.justify-between.mb-4.md\:mb-6 {
+  border-radius: 12px !important;
+  background: #030409 !important;
+  border-color: var(--jp-line) !important;
+  padding: 0.68rem 0.85rem !important;
+}
+
+.jp-hero,
+.jp-page-head,
+.jp-card,
+.jp-panel,
+.jp-hero-payload,
+.jp-selected-payload-card,
+.jp-detail-section,
+.jp-workflow-box,
+.jp-run-card,
+.jp-settings-section {
+  background: var(--jp-surface) !important;
+  border: 1px solid var(--jp-line) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.jp-hero {
+  padding: 1.15rem;
+}
+
+.jp-hero h1,
+.jp-page-head h1 {
+  color: #fff;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.jp-hero h1 {
+  font-size: clamp(2.2rem, 5.6vw, 4.25rem);
+}
+
+.jp-page-head {
+  padding: 1rem 1.1rem;
+}
+
+.jp-page-head h1 {
+  font-size: clamp(1.85rem, 3.8vw, 2.8rem);
+}
+
+.jp-kicker,
+.jp-mini-title,
+.jp-panel-title {
+  color: var(--jp-green) !important;
+  letter-spacing: 0.12em;
+}
+
+.jp-panel-subtitle,
+.jp-card-meta,
+.jp-payload-desc,
+.jp-field-help {
+  color: var(--jp-muted) !important;
+}
+
+.jp-home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+
+.jp-btn,
+button,
+a.ide-toolbar-btn {
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+.jp-btn {
+  background: #0a0c13 !important;
+  border-color: var(--jp-line) !important;
+  color: #f4f6ff !important;
+}
+
+.jp-btn:hover {
+  border-color: rgba(85, 255, 173, 0.38) !important;
+  background: #0d111a !important;
+}
+
+.jp-btn-primary {
+  background: #082015 !important;
+  border-color: rgba(85, 255, 173, 0.42) !important;
+  color: var(--jp-green) !important;
+}
+
+.jp-btn-muted {
+  background: #070911 !important;
+  color: #d5d9e8 !important;
+}
+
+.jp-btn-danger {
+  background: rgba(255, 85, 119, 0.1) !important;
+  border-color: rgba(255, 85, 119, 0.36) !important;
+  color: #ffd7df !important;
+}
+
+input,
+textarea,
+select,
+.jp-field input,
+.jp-field textarea,
+.jp-field select {
+  background: #02030a !important;
+  border: 1px solid var(--jp-line) !important;
+  border-radius: 10px !important;
+  color: #fff !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: rgba(181, 108, 255, 0.72) !important;
+  box-shadow: 0 0 0 1px rgba(181, 108, 255, 0.5) !important;
+}
+
+.jp-category-card,
+.jp-payload-card,
+.jp-iface-row,
+.jp-network-row,
+.jp-check-row,
+.jp-diag-row,
+.jp-quick-command-list button {
+  background: var(--jp-surface-2) !important;
+  border-color: var(--jp-line) !important;
+  border-radius: 10px !important;
+}
+
+.jp-category-active,
+.jp-payload-selected {
+  border-color: rgba(181, 108, 255, 0.62) !important;
+  background: rgba(181, 108, 255, 0.08) !important;
+}
+
+.jp-payload-list {
+  max-height: calc(100vh - 23rem);
+}
+
+.jp-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 1rem;
+  align-items: start;
+}
+
+.jp-settings-main,
+.jp-settings-side {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.jp-settings-side {
+  position: sticky;
+  top: 1rem;
+}
+
+.jp-settings-section {
+  padding: 0.85rem;
+}
+
+.jp-update-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid rgba(255, 214, 102, 0.32);
+  border-radius: 10px;
+  background: rgba(255, 214, 102, 0.08);
+  color: #ffe5a0;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.jp-inline-link {
+  color: var(--jp-green);
+  font-weight: 900;
+}
+
+.jp-log {
+  background: #010208 !important;
+  border-color: var(--jp-line) !important;
+  color: #dfffea !important;
+}
+
+.jp-mobile-tabbar {
+  background: #030409;
+  border-color: var(--jp-line);
+}
+
+.jp-mobile-tabbar button {
+  color: var(--jp-muted);
+}
+
+.jp-mobile-tabbar .jp-mobile-active {
+  color: var(--jp-green);
+}
+
+@media (max-width: 900px) {
+  .jp-settings-grid,
+  .jp-payload-workbench,
+  .jp-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .jp-category-panel,
+  .jp-active-run-panel,
+  .jp-settings-side {
+    position: static;
+  }
+
+  .jp-payload-list {
+    max-height: none;
+  }
+}
+
 /* Shared shell feel */
 #sidebar,
 header {
